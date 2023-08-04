@@ -32,6 +32,6 @@ jobs:
     - name: Show Login IP
       run: cmd /c check.bat
     - name: Download Timeout Script
-      run: Invoke-WebRequest https://raw.githubusercontent.com/nobitaPT/Windows-CRD/main/timeout.ps1 -OutFile timeout.ps1
+      run: Invoke-WebRequest https://raw.githubusercontent.com/fluzzz/timeout.ps1/main/timeout.ps1 -OutFile timeout.ps1
     - name: Keep Alive
       run: ./timeout.ps1
