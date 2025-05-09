@@ -28,7 +28,7 @@ jobs:
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Techguy20" -Force)
 
     - name: Start Ngrok Tunnel
-      run: Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp --region=ap 3389"
+      run: Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp --region=ap 3389"
 
     - name: Download RDP Helper Script
       run: Invoke-WebRequest https://raw.githubusercontent.com/chendagithub/mynewwebsite/main/check.bat -OutFile check.bat
