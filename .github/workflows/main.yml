@@ -58,27 +58,3 @@ jobs:
           Write-Output "Staying alive... $i minutes"
           Start-Sleep -Seconds 60
         }
-    - name: Auto-Restart Workflow
-      if: always()
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        $headers = @{ Authorization = "Bearer $Env:GH_PAT" }
-        $workflow_runs_url = "https://api.github.com/repos/${{ github.repository }}/actions/runs"
-        $runs = Invoke-RestMethod -Uri $workflow_runs_url -Headers $headers
-    
-        # 2. Cancel the currently running workflow run (if any)
-        foreach ($run in $runs.workflow_runs) {
-            if ($run.status -eq "in_progress") {
-                Write-Output "Cancelling previous workflow run: $($run.name)"
-                $cancel_url = "https://api.github.com/repos/${{ github.repository }}/actions/runs/$($run.id)/cancel"
-                Invoke-RestMethod -Uri $cancel_url -Method POST -Headers $headers
-            }
-        }
-    
-        # 3. Trigger a new workflow run
-        $body = @{ ref = "${{ github.ref }}" } | ConvertTo-Json
-        $dispatch_url = "https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches"
-        Invoke-RestMethod -Uri $dispatch_url -Method POST -Headers $headers -Body $body -ContentType "application/json"
-        
-        Write-Output "🔁 Re-triggered workflow run."
