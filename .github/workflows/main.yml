@@ -8,27 +8,12 @@ jobs:
 
     steps:
     - name: Download Ngrok (v3)
-      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-
-    - name: Extract Ngrok
-      run: Expand-Archive ngrok.zip -DestinationPath .
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.exe
 
     - name: Add Ngrok Authtoken
-      run: .\ngrok.exe config add-authtoken "$Env:NGROK_AUTH_TOKEN"
+      run: .\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-
-    - name: Create Ngrok Config File
-      run: |
-        $config = @"
-        version: 2
-        tunnels:
-          rdp:
-            proto: tcp
-            addr: 3389
-            region: ap
-        "@
-        $config | Out-File ngrok.yml -Encoding ASCII
 
     - name: Enable RDP and Firewall
       run: |
@@ -36,23 +21,31 @@ jobs:
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
 
-    - name: Set Runner Password
+    - name: Set Runner Admin Password
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Techguy20" -Force)
 
-    - name: Start Ngrok Tunnel
-      run: Start-Process -NoNewWindow -FilePath ".\ngrok.exe" -ArgumentList "start --config=ngrok.yml rdp"
+    - name: Start Ngrok Tunnel in Background
+      run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok.exe tcp --region=ap 3389'
 
-    - name: Wait for Ngrok to Initialize
+    - name: Wait for Ngrok to Start
       run: Start-Sleep -Seconds 10
 
-    - name: Fetch Ngrok Public Endpoint
+    - name: Fetch Ngrok TCP Public URL
       run: |
-        $tunnels = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
-        foreach ($tunnel in $tunnels.tunnels) {
-          if ($tunnel.name -eq "rdp") {
-            Write-Output "🔗 RDP Endpoint: $($tunnel.public_url)"
+        $maxAttempts = 5
+        for ($i = 0; $i -lt $maxAttempts; $i++) {
+          try {
+            $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
+            $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
+            if ($tcpTunnel) {
+              Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
+              exit 0
+            }
+          } catch {
+            Start-Sleep -Seconds 3
           }
         }
+        Write-Error "Ngrok tunnel did not start in time."
 
     - name: Keep Runner Alive
       run: Start-Sleep -Seconds 3600
