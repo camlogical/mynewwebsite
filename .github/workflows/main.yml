@@ -24,8 +24,10 @@ jobs:
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
 
-    - name: Set Runner Admin Password
-      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Techguy20" -Force)
+    - name: Set Admin Password
+      run: |
+        net user runneradmin adminrdp
+        net localgroup administrators runneradmin /add
 
     - name: Start Ngrok TCP Tunnel
       run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok\ngrok.exe tcp --region=ap 3389'
@@ -42,6 +44,8 @@ jobs:
             $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
             if ($tcpTunnel) {
               Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
+              Write-Output "👤 Username: admin"
+              Write-Output "🔑 Password: adminrdp"
               exit 0
             }
           } catch {
@@ -50,5 +54,9 @@ jobs:
         }
         Write-Error "Ngrok tunnel did not start in time."
 
-    - name: Keep Runner Alive
-      run: Start-Sleep -Seconds 3600
+    - name: Keep Runner Alive with Ping
+      run: |
+        for ($i = 0; $i -lt 360; $i++) {
+          Write-Output "Staying alive... $i minutes"
+          Start-Sleep -Seconds 60
+        }
