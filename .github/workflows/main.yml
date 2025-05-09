@@ -26,7 +26,7 @@ jobs:
 
     - name: Set Admin Password
       run: |
-        net user runneradmin adminrdp
+        net user runneradmin Adminrdp123!
         net localgroup administrators runneradmin /add
 
     - name: Start Ngrok TCP Tunnel
@@ -45,7 +45,7 @@ jobs:
             if ($tcpTunnel) {
               Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
               Write-Output "👤 Username: admin"
-              Write-Output "🔑 Password: adminrdp"
+              Write-Output "🔑 Password: Adminrdp123!"
               exit 0
             }
           } catch {
