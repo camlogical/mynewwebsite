@@ -7,8 +7,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Download Latest Ngrok
-      run: Invoke-WebRequest https://bin.ngrok.io/ngrok.exe -OutFile ngrok.exe
+    - name: Download Ngrok
+      run: Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+    - name: Extract Ngrok Archive
+      run: Expand-Archive ngrok.zip
+
 
     - name: Authenticate Ngrok
       run: .\ngrok.exe config add-authtoken "$Env:NGROK_AUTH_TOKEN"
