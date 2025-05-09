@@ -33,14 +33,9 @@ jobs:
     - name: Wait for Ngrok to Initialize
       run: Start-Sleep -Seconds 10  # Wait for Ngrok to fully initialize before accessing its API.
 
-    - name: Get Public Ngrok URL
+    - name: Get Ngrok Tunnel Status Using CLI
       run: |
-        $url = Invoke-RestMethod -Uri http://127.0.0.1:4040/api/tunnels
-        if ($url.tunnels.Count -gt 0) {
-          Write-Output "Ngrok public URL: $($url.tunnels[0].public_url)"
-        } else {
-          Write-Error "No Ngrok tunnel found"
-        }
+        ngrok tunnel list
       continue-on-error: true
 
     - name: Download RDP Helper Script
