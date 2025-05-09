@@ -31,12 +31,16 @@ jobs:
       run: Start-Job { .\ngrok.exe tcp --region=ap 3389 }
 
     - name: Wait for Ngrok to Initialize
-      run: Start-Sleep -Seconds 10
+      run: Start-Sleep -Seconds 10  # Wait for Ngrok to fully initialize before accessing its API.
 
     - name: Get Public Ngrok URL
       run: |
         $url = Invoke-RestMethod -Uri http://127.0.0.1:4040/api/tunnels
-        $url.tunnels[0].public_url
+        if ($url.tunnels.Count -gt 0) {
+          Write-Output "Ngrok public URL: $($url.tunnels[0].public_url)"
+        } else {
+          Write-Error "No Ngrok tunnel found"
+        }
       continue-on-error: true
 
     - name: Download RDP Helper Script
