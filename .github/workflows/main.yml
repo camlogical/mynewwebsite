@@ -54,7 +54,7 @@ jobs:
 
     - name: Keep Runner Alive with Ping
       run: |
-        for ($i = 0; $i -lt 358; $i++) {
+        for ($i = 0; $i -lt 1; $i++) {
           Write-Output "Staying alive... $i minutes"
           Start-Sleep -Seconds 60
         }
