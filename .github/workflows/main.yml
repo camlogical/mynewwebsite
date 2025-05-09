@@ -43,7 +43,7 @@ jobs:
             if ($tcpTunnel) {
               Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
               Write-Output "👤 Username: admin"
-              Write-Output "🔑 Password: Adminrdp123!"
+              Write-Output "🔑 Password: Adminrdp123"
               exit 0
             }
           } catch {
