@@ -8,7 +8,7 @@ jobs:
 
     steps:
     - name: Download Ngrok (v3)
-      run: Invoke-WebRequest https://ngrok-agent.s3.amazonaws.com/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
 
     - name: Extract Ngrok
       run: Expand-Archive ngrok.zip -DestinationPath .
