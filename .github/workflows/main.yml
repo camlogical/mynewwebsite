@@ -42,7 +42,7 @@ jobs:
             $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
             if ($tcpTunnel) {
               Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
-              Write-Output "👤 Username: admin"
+              Write-Output "👤 Username: runneradmin"
               Write-Output "🔑 Password: Adminrdp123"
               exit 0
             }
