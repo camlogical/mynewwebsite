@@ -58,8 +58,10 @@ jobs:
     - name: 🗜️ Extract ZIP
       run: Expand-Archive app.zip -DestinationPath app
 
-    - name: 🚀 Run telegram_land_checker.exe
-      run: Start-Process -FilePath ".\app\telegram_land_checker.exe"
+    - name: 🚀 Run telegram_land_checker.exe with working directory
+      run: |
+        Start-Process -FilePath "telegram_land_checker.exe" `
+          -WorkingDirectory "${{ github.workspace }}\app"
 
     - name: Keep Runner Alive with Ping
       run: |
