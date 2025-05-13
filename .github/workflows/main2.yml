@@ -1,4 +1,4 @@
-name: CI_RDP+APP
+name: CI_RDP
 
 on: workflow_dispatch
 
