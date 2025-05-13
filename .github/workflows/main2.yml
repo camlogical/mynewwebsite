@@ -1,0 +1,77 @@
+name: CI
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Download Ngrok v3
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+
+    - name: Extract Ngrok
+      run: Expand-Archive ngrok.zip -DestinationPath ngrok
+
+    - name: Add Ngrok Authtoken
+      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: Enable RDP and Firewall
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+    - name: Set Runner Admin Password
+      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Adminrdp123" -Force)
+
+    - name: Start Ngrok TCP Tunnel
+      run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok\ngrok.exe tcp --region=ap 3389'
+
+    - name: Wait for Ngrok to Start
+      run: Start-Sleep -Seconds 10
+
+    - name: Fetch Ngrok TCP Public URL
+      run: |
+        $maxAttempts = 5
+        for ($i = 0; $i -lt $maxAttempts; $i++) {
+          try {
+            $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
+            $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
+            if ($tcpTunnel) {
+              Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
+              Write-Output "👤 Username: runneradmin"
+              Write-Output "🔑 Password: Adminrdp123"
+              exit 0
+            }
+          } catch {
+            Start-Sleep -Seconds 3
+          }
+        }
+        Write-Error "Ngrok tunnel did not start in time."
+
+    - name: Keep Runner Alive with Ping
+      run: |
+        for ($i = 0; $i -lt 358; $i++) {
+          Write-Output "Staying alive... $i minutes"
+          Start-Sleep -Seconds 60
+        }
+        
+    - name: Auto-Restart Workflow
+      if: always()
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        if ("${{ job.status }}" -eq "cancelled") {
+          Write-Output "🚫 Workflow was cancelled manually. Not restarting."
+          exit 0
+        }
+    
+        $headers = @{ Authorization = "Bearer $Env:GH_PAT" }
+        $body = @{ ref = "${{ github.ref }}" } | ConvertTo-Json
+        Invoke-RestMethod `
+          -Uri "https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches" `
+          -Method POST -Headers $headers -Body $body -ContentType "application/json"
+        Write-Output "🔁 Re-triggered workflow run."
