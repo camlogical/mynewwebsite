@@ -54,13 +54,13 @@ jobs:
 
     - name: 🧰 Install OpenVPN from your server
       run: |
-        curl.exe -L "https://secuhex.com/vpn/OpenVPN.msi" -o OpenVPN.msi
+        curl.exe -L "https://secuhex.com/OpenVPN.msi" -o OpenVPN.msi
         Start-Process msiexec.exe -ArgumentList '/i', 'OpenVPN.msi', '/quiet', '/norestart' -Wait
 
     - name: 📂 Download VPN Config and Credentials
       run: |
-        Invoke-WebRequest -Uri "https://secuhex.com/vpn/cambodia_tcp.ovpn" -OutFile "C:\Users\runneradmin\cambodia.ovpn"
-        Invoke-WebRequest -Uri "https://secuhex.com/vpn/creds.txt" -OutFile "C:\Users\runneradmin\creds.txt"
+        Invoke-WebRequest -Uri "https://secuhex.com/cambodia_tcp.ovpn" -OutFile "C:\Users\runneradmin\cambodia.ovpn"
+        Invoke-WebRequest -Uri "https://secuhex.com/creds.txt" -OutFile "C:\Users\runneradmin\creds.txt"
 
     - name: 🌐 Connect to Cambodia VPN
       run: |
