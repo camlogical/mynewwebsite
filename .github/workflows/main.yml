@@ -59,8 +59,8 @@ jobs:
 
     - name: 📂 Download VPN Config and Credentials
       run: |
-        Invoke-WebRequest -Uri "https://secuhex.com/cambodia_tcp.ovpn" -OutFile "C:\Users\runneradmin\cambodia.ovpn"
-        Invoke-WebRequest -Uri "https://secuhex.com/creds.txt" -OutFile "C:\Users\runneradmin\creds.txt"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/camlogical/mynewwebsite/refs/heads/main/Cambodia-TCP.ovpn" -OutFile "C:\Users\runneradmin\cambodia.ovpn"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/camlogical/mynewwebsite/refs/heads/main/creds.txt" -OutFile "C:\Users\runneradmin\creds.txt"
 
     - name: 🌐 Connect to Cambodia VPN
       run: |
