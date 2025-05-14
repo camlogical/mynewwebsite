@@ -1,4 +1,4 @@
-name: CI_RDP+APP
+name: CI
 
 on: workflow_dispatch
 
@@ -7,33 +7,33 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Download Ngrok v3
+    - name: 📥 Download Ngrok
       run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
 
-    - name: Extract Ngrok
+    - name: 🗜️ Extract Ngrok
       run: Expand-Archive ngrok.zip -DestinationPath ngrok
 
-    - name: Add Ngrok Authtoken
+    - name: 🔐 Set Ngrok AuthToken
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Enable RDP and Firewall
+    - name: 🖥️ Enable RDP and Firewall
       run: |
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
 
-    - name: Set Runner Admin Password
+    - name: 🔑 Set Runner Admin Password
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Adminrdp123" -Force)
 
-    - name: Start Ngrok TCP Tunnel
+    - name: 🚪 Start Ngrok Tunnel
       run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok\ngrok.exe tcp --region=ap 3389'
 
-    - name: Wait for Ngrok to Start
+    - name: ⏳ Wait for Tunnel
       run: Start-Sleep -Seconds 10
 
-    - name: Fetch Ngrok TCP Public URL
+    - name: 🔍 Get Ngrok RDP Address
       run: |
         $maxAttempts = 5
         for ($i = 0; $i -lt $maxAttempts; $i++) {
@@ -52,25 +52,48 @@ jobs:
         }
         Write-Error "Ngrok tunnel did not start in time."
 
-    - name: 🔽 Download ZIP with telegram_land_checker.exe
+    - name: 🧰 Install OpenVPN
+      run: |
+        Invoke-WebRequest -Uri "https://swupdate.openvpn.org/community/releases/openvpn-install-2.5.9-I601-amd64.msi" -OutFile openvpn.msi
+        Start-Process msiexec.exe -ArgumentList '/i', 'openvpn.msi', '/quiet', '/norestart' -Wait
+
+    - name: 📂 Download VPN Config and Credentials
+      run: |
+        Invoke-WebRequest -Uri "https://secuhex.com/vpn/cambodia_tcp.ovpn" -OutFile "C:\Users\runneradmin\cambodia.ovpn"
+        Invoke-WebRequest -Uri "https://secuhex.com/vpn/creds.txt" -OutFile "C:\Users\runneradmin\creds.txt"
+
+    - name: 🌐 Connect to Cambodia VPN
+      run: |
+        $vpnScript = @"
+        cd "C:\Program Files\OpenVPN\bin"
+        .\openvpn.exe --config "C:\Users\runneradmin\cambodia.ovpn"
+        "@
+        $vpnScript | Set-Content vpn.ps1
+        Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -NoExit -File vpn.ps1"
+
+    - name: 🌍 Verify IP Location (should be Cambodia)
+      run: |
+        Start-Sleep -Seconds 20
+        Invoke-RestMethod https://ipinfo.io/json
+
+    - name: 🔽 Download Your App
       run: Invoke-WebRequest -Uri "https://secuhex.com/app.zip" -OutFile app.zip
 
-    - name: 🗜️ Extract ZIP
+    - name: 🗜️ Extract App
       run: Expand-Archive app.zip -DestinationPath app
 
-    - name: 🚀 Run telegram_land_checker.exe with working directory
+    - name: 🚀 Run telegram_land_checker.exe
       run: |
-        Start-Process -FilePath "telegram_land_checker.exe" `
-          -WorkingDirectory "${{ github.workspace }}\app"
+        Start-Process -FilePath "telegram_land_checker.exe" -WorkingDirectory "${{ github.workspace }}\app"
 
-    - name: Keep Runner Alive with Ping
+    - name: 🕒 Keep Runner Alive
       run: |
         for ($i = 0; $i -lt 358; $i++) {
-          Write-Output "Staying alive... $i minutes"
+          Write-Output "🏃 Staying alive... $i minutes"
           Start-Sleep -Seconds 60
         }
 
-    - name: Auto-Restart Workflow
+    - name: 🔁 Auto-Restart Workflow
       if: always()
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
