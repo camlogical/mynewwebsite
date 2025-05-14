@@ -62,10 +62,11 @@ jobs:
         Invoke-WebRequest -Uri "https://raw.githubusercontent.com/camlogical/mynewwebsite/refs/heads/main/Cambodia-TCP.ovpn" -OutFile "C:\Users\runneradmin\cambodia.ovpn"
         Invoke-WebRequest -Uri "https://raw.githubusercontent.com/camlogical/mynewwebsite/refs/heads/main/creds.txt" -OutFile "C:\Users\runneradmin\creds.txt"
 
-    - name: 🔐 Connect to Cambodia VPN
+    - name: 🔐 Connect to Cambodia VPN (Background Mode)
       run: |
-        cd "C:\Program Files\OpenVPN\bin"
-        .\openvpn.exe --config "C:\Users\runneradmin\cambodia.ovpn" --auth-user-pass "C:\Users\runneradmin\creds.txt" --verb 3
+        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" `
+          -ArgumentList "--config C:\Users\runneradmin\cambodia.ovpn --auth-user-pass C:\Users\runneradmin\creds.txt --log C:\vpn.log --verb 3"
+
 
     - name: 🌍 Verify IP Location (should be Cambodia)
       run: |
