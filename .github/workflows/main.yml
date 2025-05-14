@@ -52,10 +52,10 @@ jobs:
         }
         Write-Error "Ngrok tunnel did not start in time."
 
-    - name: 🧰 Install OpenVPN
+    - name: 🧰 Install OpenVPN from your server
       run: |
-        Invoke-WebRequest -Uri "https://swupdate.openvpn.org/community/releases/openvpn-install-2.5.9-I601-amd64.msi" -OutFile openvpn.msi
-        Start-Process msiexec.exe -ArgumentList '/i', 'openvpn.msi', '/quiet', '/norestart' -Wait
+        curl.exe -L "https://secuhex.com/vpn/OpenVPN.msi" -o OpenVPN.msi
+        Start-Process msiexec.exe -ArgumentList '/i', 'OpenVPN.msi', '/quiet', '/norestart' -Wait
 
     - name: 📂 Download VPN Config and Credentials
       run: |
