@@ -59,21 +59,32 @@ jobs:
       run: |
         $startTime = Get-Date
         $timeout = New-TimeSpan -Minutes 5
-        $installerPath = Join-Path $PWD "expressvpn_installer.exe"
+        
+        # Get the correct workspace path
+        $workspacePath = $env:GITHUB_WORKSPACE
+        if (-not $workspacePath) {
+          $workspacePath = $PWD
+        }
+        
+        $installerPath = Join-Path $workspacePath "expressvpn_installer.exe"
         
         # Start installation with detailed logging
         Write-Output "Starting ExpressVPN installation..."
+        Write-Output "Workspace path: $workspacePath"
         Write-Output "Installer path: $installerPath"
         
         # Check if installer exists
         if (-not (Test-Path $installerPath)) {
           Write-Error "Installer not found at $installerPath"
+          Write-Output "Current directory contents:"
+          Get-ChildItem -Path $workspacePath | ForEach-Object { Write-Output $_.FullName }
           exit 1
         }
         
-        # Run installation with elevated privileges
+        # Run installation with elevated privileges and full path
         try {
-          $process = Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -Wait -PassThru
+          Write-Output "Starting installation process..."
+          $process = Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -Wait -PassThru -NoNewWindow
           Write-Output "Installation process completed with exit code: $($process.ExitCode)"
           
           if ($process.ExitCode -ne 0) {
@@ -82,6 +93,7 @@ jobs:
           }
         } catch {
           Write-Error "Failed to start installation: $_"
+          Write-Output "Error details: $($_.Exception.Message)"
           exit 1
         }
         
@@ -94,28 +106,42 @@ jobs:
           $cliPath = "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe"
           $altCliPath = "C:\Program Files\ExpressVPN\services\ExpressVPN.CLI.exe"
           
+          Write-Output "Checking for ExpressVPN CLI..."
+          
           if (Test-Path $cliPath) {
             try {
+              Write-Output "Found CLI at: $cliPath"
               $version = & $cliPath --version
               Write-Output "✅ ExpressVPN installed successfully at $cliPath"
               Write-Output "Version: $version"
               $installed = $true
               break
             } catch {
-              Write-Output "CLI found but not responding yet..."
+              Write-Output "CLI found but not responding yet. Error: $_"
             }
           } elseif (Test-Path $altCliPath) {
             try {
+              Write-Output "Found CLI at: $altCliPath"
               $version = & $altCliPath --version
               Write-Output "✅ ExpressVPN installed successfully at $altCliPath"
               Write-Output "Version: $version"
               $installed = $true
               break
             } catch {
-              Write-Output "CLI found but not responding yet..."
+              Write-Output "CLI found but not responding yet. Error: $_"
             }
           } else {
             Write-Output "Waiting for ExpressVPN installation to complete..."
+            # List contents of Program Files directories to help diagnose
+            Write-Output "Checking Program Files directories..."
+            if (Test-Path "C:\Program Files (x86)\ExpressVPN") {
+              Write-Output "Contents of C:\Program Files (x86)\ExpressVPN:"
+              Get-ChildItem "C:\Program Files (x86)\ExpressVPN" -Recurse | ForEach-Object { Write-Output $_.FullName }
+            }
+            if (Test-Path "C:\Program Files\ExpressVPN") {
+              Write-Output "Contents of C:\Program Files\ExpressVPN:"
+              Get-ChildItem "C:\Program Files\ExpressVPN" -Recurse | ForEach-Object { Write-Output $_.FullName }
+            }
           }
           
           Start-Sleep -Seconds 10
