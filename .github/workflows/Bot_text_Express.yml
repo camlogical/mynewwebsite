@@ -1,4 +1,4 @@
-name: CI_RDP+Express
+name: CI_RDP+Bot_text+Express
 
 on: workflow_dispatch
 
