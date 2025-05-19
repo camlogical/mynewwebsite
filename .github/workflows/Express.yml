@@ -63,12 +63,14 @@ jobs:
         $key = "${Env:EXPRESSVPN_ACTIVATION_CODE}"
 
         if (Test-Path $exePath) {
-          $logPath = "$env:TEMP\expressvpn-activate.log"
+          $stdoutLog = "$env:TEMP\expressvpn-activate-out.log"
+          $stderrLog = "$env:TEMP\expressvpn-activate-err.log"
+
           $process = Start-Process -FilePath $exePath `
             -ArgumentList "activate $key" `
             -WindowStyle Hidden `
-            -RedirectStandardOutput $logPath `
-            -RedirectStandardError $logPath `
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog `
             -PassThru
 
           $maxWait = 60
@@ -83,7 +85,9 @@ jobs:
           }
 
           Write-Output "📄 Activation Output:"
-          Get-Content $logPath | Write-Output
+          Get-Content $stdoutLog | Write-Output
+          Write-Output "⚠️ Activation Errors (if any):"
+          Get-Content $stderrLog | Write-Output
         } else {
           Write-Output "⚠️ ExpressVPN executable not found at expected path."
         }
@@ -94,7 +98,7 @@ jobs:
       run: |
         $exe = "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe"
         if (Test-Path $exe) {
-          & $exe connect Cambodia
+          Start-Process -FilePath $exe -ArgumentList "connect Cambodia" -Wait
         } else {
           Write-Output "⚠️ ExpressVPN executable not found."
         }
