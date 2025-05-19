@@ -59,9 +59,25 @@ jobs:
       run: |
         Write-Output "Starting ExpressVPN installation..."
         $installerPath = Join-Path $PWD "expressvpn_installer.exe"
-        Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -Wait
-        Write-Output "Installation process started, waiting 2 minutes..."
+        
+        # Start installation in background
+        $process = Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -PassThru
+        
+        # Wait for 2 minutes then continue
+        Write-Output "Waiting 2 minutes for installation..."
         Start-Sleep -Seconds 120
+        
+        # Try to stop the process if it's still running
+        try {
+          if (-not $process.HasExited) {
+            Write-Output "2 minutes elapsed, continuing with workflow..."
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          }
+        } catch {
+          Write-Output "Process already completed or couldn't be stopped"
+        }
+        
+        Write-Output "Proceeding to next step..."
 
     - name: 🔍 Verify ExpressVPN Installation
       run: |
