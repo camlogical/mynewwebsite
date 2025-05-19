@@ -1,0 +1,175 @@
+name: CI_RDP+Express
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: 📥 Download Ngrok
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+
+    - name: 🗜️ Extract Ngrok
+      run: Expand-Archive ngrok.zip -DestinationPath ngrok
+
+    - name: 🔐 Set Ngrok AuthToken
+      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: 🖥️ Enable RDP and Firewall
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+    - name: 🔑 Set Runner Admin Password
+      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Adminrdp123" -Force)
+
+    - name: 🚪 Start Ngrok Tunnel
+      run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok\ngrok.exe tcp --region=ap 3389'
+
+    - name: ⏳ Wait for Tunnel
+      run: Start-Sleep -Seconds 10
+
+    - name: 🔍 Get Ngrok RDP Address
+      run: |
+        $maxAttempts = 5
+        for ($i = 0; $i -lt $maxAttempts; $i++) {
+          try {
+            $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
+            $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
+            if ($tcpTunnel) {
+              Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
+              Write-Output "👤 Username: runneradmin"
+              Write-Output "🔑 Password: Adminrdp123"
+              exit 0
+            }
+          } catch {
+            Start-Sleep -Seconds 3
+          }
+        }
+        Write-Error "Ngrok tunnel did not start in time."
+
+    - name: 📥 Download ExpressVPN installer
+      run: Invoke-WebRequest -Uri "https://www.expressvpn.com/clients/windows/expressvpn_windows_12.101.0.45_release.exe" -OutFile "expressvpn_installer.exe"
+
+    - name: 📥 Install ExpressVPN (2 minutes timeout)
+      run: |
+        Write-Output "Starting ExpressVPN installation..."
+        $installerPath = Join-Path $PWD "expressvpn_installer.exe"
+        
+        # Start installation in background
+        $process = Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -PassThru
+        
+        # Wait for 2 minutes then continue
+        Write-Output "Waiting 2 minutes for installation..."
+        Start-Sleep -Seconds 120
+        
+        # Try to stop the process if it's still running
+        try {
+          if (-not $process.HasExited) {
+            Write-Output "2 minutes elapsed, continuing with workflow..."
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          }
+        } catch {
+          Write-Output "Process already completed or couldn't be stopped"
+        }
+        
+        Write-Output "Proceeding to next step..."
+
+    - name: 🔍 Verify ExpressVPN Installation
+      run: |
+        Write-Output "Checking ExpressVPN installation path..."
+        $cliPath = "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe"
+        if (Test-Path $cliPath) {
+          Write-Output "✅ ExpressVPN CLI found at: $cliPath"
+        } else {
+          Write-Error "❌ ExpressVPN CLI not found at expected path"
+          exit 1
+        }
+
+    - name: 🔐 Activate ExpressVPN
+      run: |
+        Write-Output "Activating ExpressVPN..."
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        & ".\ExpressVPN.CLI.exe" activate EGDZJT2BC5AVY5E7YJS3PXN
+        Write-Output "Waiting 30s for activation to complete..."
+        Start-Sleep -Seconds 30
+
+    - name: 🌍 Connect to Cambodia Server
+      run: |
+        Write-Output "Connecting to Cambodia server..."
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        & ".\ExpressVPN.CLI.exe" connect Cambodia
+        Write-Output "Waiting 30 seconds for connection to establish..."
+        Start-Sleep -Seconds 30
+
+    - name: 🔍 Verify Cambodia Connection
+      run: |
+        Write-Output "Verifying connection to Cambodia..."
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        $status = & ".\ExpressVPN.CLI.exe" status
+        Write-Output "VPN Status: $status"
+        
+        # Check IP location
+        $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
+        Write-Output "Current IP: $($ipInfo.ip)"
+        
+        # Additional IP location check
+        $locationInfo = Invoke-RestMethod -Uri "http://ip-api.com/json/$($ipInfo.ip)"
+        Write-Output "IP Location: $($locationInfo.country) - $($locationInfo.city)"
+        
+        if ($locationInfo.country -ne "Cambodia") {
+          Write-Error "❌ Not connected to Cambodia server"
+          exit 1
+        } else {
+          Write-Output "✅ Successfully connected to Cambodia server"
+        }
+
+    - name: 🔍 Verify VPN Connection
+      run: |
+        # Change to ExpressVPN services directory
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        
+        $status = & ".\ExpressVPN.CLI.exe" status
+        Write-Output "Current VPN Status: $status"
+        
+        # Additional verification
+        $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
+        Write-Output "Current IP: $($ipInfo.ip)"
+
+    - name: 🔽 Download Your App
+      run: Invoke-WebRequest -Uri "https://secuhex.com/app2.zip" -OutFile app2.zip
+
+    - name: 🗜️ Extract App
+      run: Expand-Archive app2.zip -DestinationPath app1
+
+    - name: 🚀 Run telegram_land_checker.exe
+      run: |
+        Start-Process -FilePath "telegram_land_checker.exe" -WorkingDirectory "${{ github.workspace }}\app2"
+
+    - name: 🕒 Keep Runner Alive
+      run: |
+        for ($i = 0; $i -lt 358; $i++) {
+          Write-Output "🏃 Staying alive... $i minutes"
+          Start-Sleep -Seconds 60
+        }
+
+    - name: 🔁 Auto-Restart Workflow
+      if: always()
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        if ("${{ job.status }}" -eq "cancelled") {
+          Write-Output "🚫 Workflow was cancelled manually. Not restarting."
+          exit 0
+        }
+
+        $headers = @{ Authorization = "Bearer $Env:GH_PAT" }
+        $body = @{ ref = "${{ github.ref }}" } | ConvertTo-Json
+        Invoke-RestMethod `
+          -Uri "https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches" `
+          -Method POST -Headers $headers -Body $body -ContentType "application/json"
+        Write-Output "🔁 Re-triggered workflow run."
