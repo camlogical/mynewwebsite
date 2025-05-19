@@ -148,7 +148,22 @@ jobs:
 
     - name: 🚀 Run telegram_land_checker.exe
       run: |
-        Start-Process -FilePath "telegram_land_checker.exe" -WorkingDirectory "${{ github.workspace }}\app"
+        $appPath = Join-Path $PWD "app1"
+        Write-Output "Starting telegram_land_checker.exe from: $appPath"
+        
+        if (-not (Test-Path $appPath)) {
+          Write-Error "App directory not found at: $appPath"
+          exit 1
+        }
+        
+        $exePath = Join-Path $appPath "telegram_land_checker.exe"
+        if (-not (Test-Path $exePath)) {
+          Write-Error "telegram_land_checker.exe not found at: $exePath"
+          exit 1
+        }
+        
+        Set-Location $appPath
+        Start-Process -FilePath "telegram_land_checker.exe" -NoNewWindow
 
     - name: 🕒 Keep Runner Alive
       run: |
