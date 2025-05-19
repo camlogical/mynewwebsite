@@ -55,54 +55,126 @@ jobs:
     - name: 📥 Download ExpressVPN installer
       run: Invoke-WebRequest -Uri "https://www.expressvpn.com/clients/windows/expressvpn_windows_12.101.0.45_release.exe" -OutFile "expressvpn_installer.exe"
 
-    - name: 🕒 Try to install ExpressVPN (timeout 2 minutes)
+    - name: 🕒 Install ExpressVPN with improved handling
       run: |
         $startTime = Get-Date
-        Start-Process -FilePath "expressvpn_installer.exe" -ArgumentList '/quiet', '/norestart' -PassThru | Out-Null
-        while ((Get-Date) - $startTime -lt (New-TimeSpan -Minutes 2)) {
-          Start-Sleep -Seconds 5
-          # Check if expressvpn.exe exists and responds
-          if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
+        $timeout = New-TimeSpan -Minutes 5
+        $installerPath = Join-Path $PWD "expressvpn_installer.exe"
+        
+        # Start installation
+        Write-Output "Starting ExpressVPN installation..."
+        Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -Wait
+        
+        # Wait for installation to complete
+        while ((Get-Date) - $startTime -lt $timeout) {
+          if (Test-Path "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe") {
             try {
-              & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" version | Out-Null
-              Write-Output "✅ ExpressVPN installed successfully."
-              exit 0
+              $version = & "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe" --version
+              Write-Output "✅ ExpressVPN installed successfully. Version: $version"
+              break
             } catch {
-              # Not ready yet, keep waiting
+              Write-Output "Waiting for ExpressVPN to initialize..."
+              Start-Sleep -Seconds 10
+            }
+          }
+          Start-Sleep -Seconds 5
+        }
+
+    - name: 🔐 Activate ExpressVPN with retry mechanism
+      run: |
+        $maxRetries = 3
+        $retryCount = 0
+        $activated = $false
+        
+        # Change to ExpressVPN services directory
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        
+        while (-not $activated -and $retryCount -lt $maxRetries) {
+          try {
+            Write-Output "Attempting to activate ExpressVPN (Attempt $($retryCount + 1))"
+            & ".\ExpressVPN.CLI.exe" activate $Env:EXPRESSVPN_ACTIVATION_CODE
+            Start-Sleep -Seconds 10
+            
+            # Verify activation
+            $status = & ".\ExpressVPN.CLI.exe" status
+            if ($status -match "Activated") {
+              Write-Output "✅ ExpressVPN activated successfully"
+              $activated = $true
+            } else {
+              throw "Activation verification failed"
+            }
+          } catch {
+            Write-Output "Activation attempt failed: $_"
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+              Write-Output "Retrying in 10 seconds..."
+              Start-Sleep -Seconds 10
             }
           }
         }
-        Write-Output "⚠️ ExpressVPN install timed out after 2 minutes. Skipping install."
-
-    - name: 🔐 Activate ExpressVPN CLI (skip if not installed)
-      run: |
-        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
-          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" activate $Env:EXPRESSVPN_ACTIVATION_CODE
-        } else {
-          Write-Output "ExpressVPN not installed, skipping activation."
+        
+        if (-not $activated) {
+          Write-Error "Failed to activate ExpressVPN after $maxRetries attempts"
+          exit 1
         }
       env:
         EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
 
-    - name: 🌍 Connect to Cambodia ExpressVPN server (skip if not installed)
+    - name: 🌍 Connect to Cambodia server with verification
       run: |
-        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe") {
-          & "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe" connect Cambodia
-        } else {
-          Write-Output "ExpressVPN not installed, skipping connection."
+        $maxRetries = 3
+        $retryCount = 0
+        $connected = $false
+        
+        # Change to ExpressVPN services directory
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        
+        while (-not $connected -and $retryCount -lt $maxRetries) {
+          try {
+            Write-Output "Attempting to connect to Cambodia server (Attempt $($retryCount + 1))"
+            & ".\ExpressVPN.CLI.exe" connect "Cambodia"
+            Start-Sleep -Seconds 15
+            
+            # Verify connection
+            $status = & ".\ExpressVPN.CLI.exe" status
+            if ($status -match "Connected") {
+              Write-Output "✅ Successfully connected to Cambodia server"
+              $connected = $true
+            } else {
+              throw "Connection verification failed"
+            }
+          } catch {
+            Write-Output "Connection attempt failed: $_"
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+              Write-Output "Retrying in 10 seconds..."
+              Start-Sleep -Seconds 10
+            }
+          }
+        }
+        
+        if (-not $connected) {
+          Write-Error "Failed to connect to Cambodia server after $maxRetries attempts"
+          exit 1
         }
 
-    - name: 🔍 Check ExpressVPN status (optional)
+    - name: 🔍 Verify VPN Connection
       run: |
-        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe") {
-          & "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe" status
-        }
+        # Change to ExpressVPN services directory
+        Set-Location "C:\Program Files (x86)\ExpressVPN\services"
+        
+        $status = & ".\ExpressVPN.CLI.exe" status
+        Write-Output "Current VPN Status: $status"
+        
+        # Additional verification
+        $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
+        Write-Output "Current IP: $($ipInfo.ip)"
 
     - name: 🔽 Download Your App
-      run: Invoke-WebRequest -Uri "https://secuhex.com/app.zip" -OutFile app.zip
+      run: Invoke-WebRequest -Uri "https://secuhex.com/app1.zip" -OutFile app1.zip
 
     - name: 🗜️ Extract App
-      run: Expand-Archive app.zip -DestinationPath app
+      run: Expand-Archive app1.zip -DestinationPath app1
 
     - name: 🚀 Run telegram_land_checker.exe
       run: |
