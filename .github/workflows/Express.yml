@@ -61,24 +61,87 @@ jobs:
         $timeout = New-TimeSpan -Minutes 5
         $installerPath = Join-Path $PWD "expressvpn_installer.exe"
         
-        # Start installation
+        # Start installation with detailed logging
         Write-Output "Starting ExpressVPN installation..."
-        Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -Wait
+        Write-Output "Installer path: $installerPath"
         
-        # Wait for installation to complete
+        # Check if installer exists
+        if (-not (Test-Path $installerPath)) {
+          Write-Error "Installer not found at $installerPath"
+          exit 1
+        }
+        
+        # Run installation with elevated privileges
+        try {
+          $process = Start-Process -FilePath $installerPath -ArgumentList '/quiet', '/norestart' -Wait -PassThru
+          Write-Output "Installation process completed with exit code: $($process.ExitCode)"
+          
+          if ($process.ExitCode -ne 0) {
+            Write-Error "Installation failed with exit code: $($process.ExitCode)"
+            exit 1
+          }
+        } catch {
+          Write-Error "Failed to start installation: $_"
+          exit 1
+        }
+        
+        # Wait for installation to complete and verify
+        Write-Output "Waiting for ExpressVPN to initialize..."
+        $installed = $false
+        
         while ((Get-Date) - $startTime -lt $timeout) {
-          if (Test-Path "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe") {
+          # Check for both possible installation paths
+          $cliPath = "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe"
+          $altCliPath = "C:\Program Files\ExpressVPN\services\ExpressVPN.CLI.exe"
+          
+          if (Test-Path $cliPath) {
             try {
-              $version = & "C:\Program Files (x86)\ExpressVPN\services\ExpressVPN.CLI.exe" --version
-              Write-Output "✅ ExpressVPN installed successfully. Version: $version"
+              $version = & $cliPath --version
+              Write-Output "✅ ExpressVPN installed successfully at $cliPath"
+              Write-Output "Version: $version"
+              $installed = $true
               break
             } catch {
-              Write-Output "Waiting for ExpressVPN to initialize..."
-              Start-Sleep -Seconds 10
+              Write-Output "CLI found but not responding yet..."
+            }
+          } elseif (Test-Path $altCliPath) {
+            try {
+              $version = & $altCliPath --version
+              Write-Output "✅ ExpressVPN installed successfully at $altCliPath"
+              Write-Output "Version: $version"
+              $installed = $true
+              break
+            } catch {
+              Write-Output "CLI found but not responding yet..."
+            }
+          } else {
+            Write-Output "Waiting for ExpressVPN installation to complete..."
+          }
+          
+          Start-Sleep -Seconds 10
+        }
+        
+        if (-not $installed) {
+          Write-Error "ExpressVPN installation verification failed after $($timeout.TotalMinutes) minutes"
+          Write-Output "Checking for installation logs..."
+          
+          # Check Windows Event Log for installation issues
+          $events = Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = $startTime
+          } -ErrorAction SilentlyContinue | Where-Object { $_.Message -like '*ExpressVPN*' }
+          
+          if ($events) {
+            Write-Output "Found relevant events:"
+            $events | ForEach-Object {
+              Write-Output "Time: $($_.TimeCreated) - Message: $($_.Message)"
             }
           }
-          Start-Sleep -Seconds 5
+          
+          exit 1
         }
+        
+        Write-Output "ExpressVPN installation completed successfully"
 
     - name: 🔐 Activate ExpressVPN with retry mechanism
       run: |
