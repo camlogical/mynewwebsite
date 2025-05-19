@@ -52,51 +52,57 @@ jobs:
         }
         Write-Error "Ngrok tunnel did not start in time."
 
-    - name: 📥 Download ExpressVPN installer
-      run: Invoke-WebRequest -Uri "https://www.expressvpn.com/clients/windows/expressvpn_windows_12.101.0.45_release.exe" -OutFile "expressvpn_installer.exe"
-
-    - name: 🕒 Try to install ExpressVPN (timeout 2 minutes)
+    - name: 🚩 Install ExpressVPN (Lightweight Beta)
       run: |
-        $startTime = Get-Date
-        Start-Process -FilePath "expressvpn_installer.exe" -ArgumentList '/quiet', '/norestart' -PassThru | Out-Null
-        while ((Get-Date) - $startTime -lt (New-TimeSpan -Minutes 2)) {
-          Start-Sleep -Seconds 5
-          # Check if expressvpn.exe exists and responds
-          if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
-            try {
-              & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" version | Out-Null
-              Write-Output "✅ ExpressVPN installed successfully."
-              exit 0
-            } catch {
-              # Not ready yet, keep waiting
-            }
+        curl.exe -L "https://www.expressvpn.com/clients/windows/expressvpn_windows_12.101.0.45_release.exe" -o expressvpn.exe
+        Start-Process -FilePath ".\expressvpn.exe" -ArgumentList "/quiet" -Wait
+
+    - name: 🔐 Activate ExpressVPN
+      run: |
+        $exePath = "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe"
+        $key = "${Env:EXPRESSVPN_ACTIVATION_CODE}"
+
+        if (Test-Path $exePath) {
+          $logPath = "$env:TEMP\expressvpn-activate.log"
+          $process = Start-Process -FilePath $exePath `
+            -ArgumentList "activate $key" `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $logPath `
+            -RedirectStandardError $logPath `
+            -PassThru
+
+          $maxWait = 60
+          for ($i = 0; $i -lt $maxWait; $i++) {
+            if ($process.HasExited) { break }
+            Start-Sleep -Seconds 1
           }
-        }
-        Write-Output "⚠️ ExpressVPN install timed out after 2 minutes. Skipping install."
 
-    - name: 🔐 Activate ExpressVPN CLI (skip if not installed)
-      run: |
-        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
-          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" activate $Env:EXPRESSVPN_ACTIVATION_CODE
+          if (-not $process.HasExited) {
+            Write-Output "⏱️ Activation taking too long. Killing process..."
+            Stop-Process -Id $process.Id -Force
+          }
+
+          Write-Output "📄 Activation Output:"
+          Get-Content $logPath | Write-Output
         } else {
-          Write-Output "ExpressVPN not installed, skipping activation."
+          Write-Output "⚠️ ExpressVPN executable not found at expected path."
         }
       env:
         EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
 
-    - name: 🌍 Connect to Cambodia ExpressVPN server (skip if not installed)
+    - name: 🌐 Connect to Cambodia VPN
       run: |
-        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
-          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" connect Cambodia
+        $exe = "C:\Program Files (x86)\ExpressVPN\expressvpn-ui\ExpressVPN.exe"
+        if (Test-Path $exe) {
+          & $exe connect Cambodia
         } else {
-          Write-Output "ExpressVPN not installed, skipping connection."
+          Write-Output "⚠️ ExpressVPN executable not found."
         }
 
-    - name: 🔍 Check ExpressVPN status (optional)
+    - name: 🌍 Verify VPN IP Location
       run: |
-        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
-          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" status
-        }
+        Start-Sleep -Seconds 20
+        Invoke-RestMethod https://ipinfo.io/json
 
     - name: 🔽 Download Your App
       run: Invoke-WebRequest -Uri "https://secuhex.com/app.zip" -OutFile app.zip
