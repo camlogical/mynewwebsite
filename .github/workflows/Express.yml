@@ -1,4 +1,4 @@
-name: CI_RDP+APP+Express
+name: CI_RDP+APP
 
 on: workflow_dispatch
 
@@ -52,44 +52,51 @@ jobs:
         }
         Write-Error "Ngrok tunnel did not start in time."
 
-    - name: 🧰 Install ExpressVPN (specific version)
-      run: |
-        Invoke-WebRequest -Uri "https://www.expressvpn.com/clients/windows/expressvpn_windows_12.101.0.45_release.exe" -OutFile "expressvpn_installer.exe"
-        Start-Process -FilePath "expressvpn_installer.exe" -ArgumentList '/quiet', '/norestart' -Wait
+    - name: 📥 Download ExpressVPN installer
+      run: Invoke-WebRequest -Uri "https://www.expressvpn.com/clients/windows/expressvpn_windows_12.101.0.45_release.exe" -OutFile "expressvpn_installer.exe"
 
-    - name: 🔐 Activate ExpressVPN
+    - name: 🕒 Try to install ExpressVPN (timeout 2 minutes)
       run: |
-        & "$Env:ProgramFiles\ExpressVPN\expressvpn.exe" activate $Env:EXPRESSVPN_KEY
-      env:
-        EXPRESSVPN_KEY: ${{ secrets.EXPRESSVPN_KEY }}
-
-    - name: 🌐 Connect to Cambodia VPN
-      run: |
-        & "$Env:ProgramFiles\ExpressVPN\expressvpn.exe" connect Cambodia
-
-    - name: 🔄 Watchdog - Ensure ExpressVPN stays connected
-      run: |
-        $maxChecks = 5
-        for ($i = 0; $i -lt $maxChecks; $i++) {
-          $status = & "$Env:ProgramFiles\ExpressVPN\expressvpn.exe" status
-          if ($status -match "Connected") {
-            Write-Output "✅ ExpressVPN is connected."
-            break
-          } else {
-            Write-Output "⚠️ ExpressVPN not connected. Attempting to reconnect..."
-            & "$Env:ProgramFiles\ExpressVPN\expressvpn.exe" reconnect
-            Start-Sleep -Seconds 10
-          }
-          if ($i -eq ($maxChecks - 1)) {
-            Write-Output "❌ Failed to maintain ExpressVPN connection after multiple attempts."
-            exit 1
+        $startTime = Get-Date
+        Start-Process -FilePath "expressvpn_installer.exe" -ArgumentList '/quiet', '/norestart' -PassThru | Out-Null
+        while ((Get-Date) - $startTime -lt (New-TimeSpan -Minutes 2)) {
+          Start-Sleep -Seconds 5
+          # Check if expressvpn.exe exists and responds
+          if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
+            try {
+              & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" version | Out-Null
+              Write-Output "✅ ExpressVPN installed successfully."
+              exit 0
+            } catch {
+              # Not ready yet, keep waiting
+            }
           }
         }
+        Write-Output "⚠️ ExpressVPN install timed out after 2 minutes. Skipping install."
 
-    - name: 🌍 Verify IP Location (should be Cambodia)
+    - name: 🔐 Activate ExpressVPN CLI (skip if not installed)
       run: |
-        Start-Sleep -Seconds 20
-        Invoke-RestMethod https://ipinfo.io/json
+        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
+          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" activate $Env:EXPRESSVPN_ACTIVATION_CODE
+        } else {
+          Write-Output "ExpressVPN not installed, skipping activation."
+        }
+      env:
+        EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
+
+    - name: 🌍 Connect to Cambodia ExpressVPN server (skip if not installed)
+      run: |
+        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
+          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" connect Cambodia
+        } else {
+          Write-Output "ExpressVPN not installed, skipping connection."
+        }
+
+    - name: 🔍 Check ExpressVPN status (optional)
+      run: |
+        if (Test-Path "C:\Program Files (x86)\ExpressVPN\expressvpn.exe") {
+          & "C:\Program Files (x86)\ExpressVPN\expressvpn.exe" status
+        }
 
     - name: 🔽 Download Your App
       run: Invoke-WebRequest -Uri "https://secuhex.com/app.zip" -OutFile app.zip
