@@ -1,4 +1,4 @@
-name: CI_RDP+APP
+name: CI_RDP+Express
 
 on: workflow_dispatch
 
@@ -95,8 +95,8 @@ jobs:
         Write-Output "Activating ExpressVPN..."
         Set-Location "C:\Program Files (x86)\ExpressVPN\services"
         & ".\ExpressVPN.CLI.exe" activate EGDZJT2BC5AVY5E7YJS3PXN
-        Write-Output "Waiting 1 minute for activation to complete..."
-        Start-Sleep -Seconds 60
+        Write-Output "Waiting 30s for activation to complete..."
+        Start-Sleep -Seconds 30
 
     - name: 🌍 Connect to Cambodia Server
       run: |
@@ -157,17 +157,23 @@ jobs:
         }
         
         $exePath = Join-Path $appPath "telegram_land_checker.exe"
+        Write-Output "Looking for executable at: $exePath"
+        
         if (-not (Test-Path $exePath)) {
           Write-Error "telegram_land_checker.exe not found at: $exePath"
+          Write-Output "Contents of app1 directory:"
+          Get-ChildItem $appPath | ForEach-Object { Write-Output $_.FullName }
           exit 1
         }
         
+        Write-Output "Found executable, starting process..."
         Set-Location $appPath
-        Start-Process -FilePath "telegram_land_checker.exe" -NoNewWindow
+        Start-Process -FilePath $exePath -NoNewWindow
+        Write-Output "Process started successfully"
 
     - name: 🕒 Keep Runner Alive
       run: |
-        for ($i = 0; $i -lt 350; $i++) {
+        for ($i = 0; $i -lt 358; $i++) {
           Write-Output "🏃 Staying alive... $i minutes"
           Start-Sleep -Seconds 60
         }
