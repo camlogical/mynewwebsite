@@ -92,11 +92,18 @@ jobs:
       continue-on-error: true
       run: |
         echo "Activating ExpressVPN..."
+        # Set environment variables to suppress prompts
+        export DEBIAN_FRONTEND=noninteractive
+        export TERM=dumb
+        
         # Wait for ExpressVPN CLI to be available
         sleep 5
         
-        # Activate using the full path to expressvpn
-        sudo /usr/bin/expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN
+        # Enable background mode first
+        sudo expressvpnctl background enable
+        
+        # Activate using the new command format
+        sudo expressvpnctl login xvtokenfile <<< "EGDZJT2BC5AVY5E7YJS3PXN"
         echo "Waiting 30s for activation to complete..."
         sleep 30
 
@@ -104,13 +111,17 @@ jobs:
       continue-on-error: true
       run: |
         echo "Connecting to Cambodia server..."
-        sudo expressvpn connect Cambodia > /dev/null 2>&1
+        # Get list of available regions
+        sudo expressvpnctl get regions
+        
+        # Connect to Cambodia
+        sudo expressvpnctl connect "Cambodia"
         sleep 30
 
     - name: 🔍 Verify Cambodia Connection
       continue-on-error: true
       run: |
-        vpn_status=$(sudo expressvpn status)
+        vpn_status=$(sudo expressvpnctl status)
         echo "VPN Status: $vpn_status"
         
         ip_info=$(curl -s https://api.ipify.org?format=json)
@@ -129,13 +140,53 @@ jobs:
           echo "✅ Successfully connected to Cambodia server"
         fi
 
-    - name: 🐳 Setup Docker
+    - name: 🐳 Check and Setup Docker
       run: |
-        sudo apt-get update
-        sudo apt-get install -y docker.io docker-compose
-        sudo systemctl start docker
-        sudo systemctl enable docker
-        sudo usermod -aG docker $USER
+        echo "🔍 Checking Docker installation..."
+        
+        # Check if Docker is already installed
+        if command -v docker &> /dev/null; then
+          echo "✅ Docker is already installed"
+        else
+          echo "📦 Docker not found, installing..."
+          
+          # Remove old versions if they exist
+          sudo apt-get remove -y docker docker-engine docker.io containerd runc > /dev/null 2>&1 || true
+          
+          # Update package list
+          sudo apt-get update > /dev/null 2>&1
+          
+          # Install prerequisites
+          sudo apt-get install -y \
+              apt-transport-https \
+              ca-certificates \
+              curl \
+              gnupg \
+              lsb-release > /dev/null 2>&1
+          
+          # Add Docker's official GPG key
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          
+          # Set up the stable repository
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          
+          # Update package list again
+          sudo apt-get update > /dev/null 2>&1
+          
+          # Install Docker Engine
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1
+          
+          # Start and enable Docker
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          
+          # Add current user to docker group
+          sudo usermod -aG docker $USER
+          
+          echo "✅ Docker installation completed"
+        fi
 
     - name: 🚀 Run Docker Compose
       run: |
