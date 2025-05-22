@@ -23,12 +23,19 @@ jobs:
 
     - name: 🖥️ Install and Configure RDP
       run: |
-        sudo apt-get update
-        sudo apt-get install -y xrdp xfce4 xfce4-goodies
-        sudo systemctl enable xrdp
-        sudo systemctl start xrdp
+        echo "📦 Updating package list..."
+        sudo apt-get update > /dev/null 2>&1
+        
+        echo "📥 Installing RDP and desktop environment..."
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xrdp xfce4 xfce4-goodies > /dev/null 2>&1
+        
+        echo "⚙️ Configuring RDP service..."
+        sudo systemctl enable xrdp > /dev/null 2>&1
+        sudo systemctl start xrdp > /dev/null 2>&1
         echo "xfce4-session" > ~/.xsession
-        sudo systemctl restart xrdp
+        sudo systemctl restart xrdp > /dev/null 2>&1
+        
+        echo "✅ RDP setup completed"
 
     - name: 🔑 Set RDP Password
       run: |
@@ -78,14 +85,23 @@ jobs:
 
     - name: 🔐 Activate ExpressVPN
       run: |
+        # Create .env file if it doesn't exist
+        if [ ! -f .env ]; then
+          echo "EXPRESSVPN_CODE=EGDZJT2BC5AVY5E7YJS3PXN" > .env
+        fi
+        
         # Read ExpressVPN activation code from .env file
         EXPRESSVPN_CODE=$(grep EXPRESSVPN_CODE .env | cut -d '=' -f2-)
-        sudo expressvpn activate $EXPRESSVPN_CODE
+        
+        # Activate ExpressVPN with suppressed output
+        echo "Activating ExpressVPN..."
+        sudo expressvpn activate $EXPRESSVPN_CODE > /dev/null 2>&1
         sleep 30
 
     - name: 🌍 Connect to Cambodia Server
       run: |
-        sudo expressvpn connect Cambodia
+        echo "Connecting to Cambodia server..."
+        sudo expressvpn connect Cambodia > /dev/null 2>&1
         sleep 30
 
     - name: 🔍 Verify Cambodia Connection
