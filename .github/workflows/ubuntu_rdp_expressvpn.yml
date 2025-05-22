@@ -1,0 +1,147 @@
+name: CI_Ubuntu_RDP+Bot_img+Express
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v3
+      with:
+        repository: camlogical/mynewwebsite
+        ref: main
+
+    - name: 📥 Download Ngrok
+      run: |
+        wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+        unzip ngrok-v3-stable-linux-amd64.zip
+
+    - name: 🔐 Set Ngrok AuthToken
+      run: ./ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: 🖥️ Install and Configure RDP
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xrdp xfce4 xfce4-goodies
+        sudo systemctl enable xrdp
+        sudo systemctl start xrdp
+        echo "xfce4-session" > ~/.xsession
+        sudo systemctl restart xrdp
+
+    - name: 🔑 Set RDP Password
+      run: |
+        echo "runneradmin:Adminrdp123" | sudo chpasswd
+
+    - name: 🚪 Start Ngrok Tunnel
+      run: |
+        ./ngrok tcp --region=ap 3389 > /dev/null &
+        sleep 10
+
+    - name: 🔍 Get Ngrok RDP Address
+      id: rdp
+      run: |
+        max_attempts=5
+        for i in $(seq 1 $max_attempts); do
+          response=$(curl -s http://127.0.0.1:4040/api/tunnels)
+          tcp_tunnel=$(echo $response | grep -o '"public_url":"tcp://[^"]*"' | cut -d'"' -f4)
+          if [ ! -z "$tcp_tunnel" ]; then
+            echo "✅ RDP Endpoint: $tcp_tunnel"
+            echo "👤 Username: runneradmin"
+            echo "🔑 Password: Adminrdp123"
+            echo "rdp_address=$tcp_tunnel" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          sleep 3
+        done
+        echo "❌ Ngrok tunnel did not start in time."
+        exit 1
+
+    - name: 📝 Add RDP Info to Job Summary
+      run: |
+        echo "## 🔗 RDP Connection Details" >> $GITHUB_STEP_SUMMARY
+        echo "**RDP Address:** ${{ steps.rdp.outputs.rdp_address }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Username:** runneradmin" >> $GITHUB_STEP_SUMMARY
+        echo "**Password:** Adminrdp123" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Use any RDP client to connect to the Ubuntu desktop." >> $GITHUB_STEP_SUMMARY
+
+    - name: 📥 Download ExpressVPN installer
+      run: |
+        wget https://www.expressvpn.com/clients/linux/expressvpn_3.42.0.0-1_amd64.deb
+
+    - name: 📥 Install ExpressVPN
+      run: |
+        sudo dpkg -i expressvpn_3.42.0.0-1_amd64.deb || true
+        sudo apt-get install -f -y
+
+    - name: 🔐 Activate ExpressVPN
+      run: |
+        # Read ExpressVPN activation code from .env file
+        EXPRESSVPN_CODE=$(grep EXPRESSVPN_CODE .env | cut -d '=' -f2-)
+        sudo expressvpn activate $EXPRESSVPN_CODE
+        sleep 30
+
+    - name: 🌍 Connect to Cambodia Server
+      run: |
+        sudo expressvpn connect Cambodia
+        sleep 30
+
+    - name: 🔍 Verify Cambodia Connection
+      run: |
+        vpn_status=$(sudo expressvpn status)
+        echo "VPN Status: $vpn_status"
+        
+        ip_info=$(curl -s https://api.ipify.org?format=json)
+        current_ip=$(echo $ip_info | grep -o '"ip":"[^"]*"' | cut -d'"' -f4)
+        echo "Current IP: $current_ip"
+        
+        location_info=$(curl -s http://ip-api.com/json/$current_ip)
+        country=$(echo $location_info | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
+        city=$(echo $location_info | grep -o '"city":"[^"]*"' | cut -d'"' -f4)
+        
+        echo "IP Location: $country - $city"
+        
+        if [ "$country" != "Cambodia" ]; then
+          echo "❌ Not connected to Cambodia server"
+          exit 1
+        else
+          echo "✅ Successfully connected to Cambodia server"
+        fi
+
+    - name: 🐳 Setup Docker
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker.io docker-compose
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        sudo usermod -aG docker $USER
+
+    - name: 🚀 Run Docker Compose
+      run: |
+        sudo docker-compose -f docker-compose.img.yml up -d
+
+    - name: 🕒 Keep Runner Alive
+      run: |
+        for i in {1..350}; do
+          echo "🏃 Staying alive... $i minutes"
+          sleep 60
+        done
+
+    - name: 🔁 Auto-Restart Workflow
+      if: always()
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        if [ "${{ job.status }}" = "cancelled" ]; then
+          echo "🚫 Workflow was cancelled manually. Not restarting."
+          exit 0
+        fi
+
+        curl -X POST \
+          -H "Authorization: Bearer $GH_PAT" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches \
+          -d '{"ref":"${{ github.ref }}"}'
+        echo "🔁 Re-triggered workflow run." 
