@@ -7,201 +7,201 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 📥 Checkout Repository
-      uses: actions/checkout@v3
-      with:
-        repository: camlogical/mynewwebsite
-        ref: main
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          repository: camlogical/mynewwebsite
+          ref: main
 
-    - name: 📥 Download Ngrok
-      run: |
-        wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
-        unzip ngrok-v3-stable-linux-amd64.zip
+      - name: 📥 Download Ngrok
+        run: |
+          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+          unzip ngrok-v3-stable-linux-amd64.zip
 
-    - name: 🔐 Set Ngrok AuthToken
-      run: ./ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+      - name: 🔐 Set Ngrok AuthToken
+        run: ./ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: 🖥️ Install and Configure RDP
-      run: |
-        echo "📦 Updating package list..."
-        sudo apt-get update > /dev/null 2>&1
-        
-        echo "📥 Installing RDP and desktop environment..."
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xrdp xfce4 xfce4-goodies > /dev/null 2>&1
-        
-        echo "⚙️ Configuring RDP service..."
-        sudo systemctl enable xrdp > /dev/null 2>&1
-        sudo systemctl start xrdp > /dev/null 2>&1
-        echo "xfce4-session" > ~/.xsession
-        sudo systemctl restart xrdp > /dev/null 2>&1
-        
-        echo "✅ RDP setup completed"
+      - name: 🖥️ Install and Configure RDP
+        run: |
+          echo "📦 Updating package list..."
+          sudo apt-get update > /dev/null 2>&1
+          
+          echo "📥 Installing RDP and desktop environment..."
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xrdp xfce4 xfce4-goodies > /dev/null 2>&1
+          
+          echo "⚙️ Configuring RDP service..."
+          sudo systemctl enable xrdp > /dev/null 2>&1
+          sudo systemctl start xrdp > /dev/null 2>&1
+          echo "xfce4-session" > ~/.xsession
+          sudo systemctl restart xrdp > /dev/null 2>&1
+          
+          echo "✅ RDP setup completed"
 
-    - name: 🔑 Set RDP Password
-      run: |
-        echo "runneradmin:Adminrdp123" | sudo chpasswd
+      - name: 🔑 Set RDP Password
+        run: |
+          echo "runneradmin:Adminrdp123" | sudo chpasswd
 
-    - name: 🚪 Start Ngrok Tunnel
-      run: |
-        ./ngrok tcp --region=ap 3389 > /dev/null &
-        sleep 10
+      - name: 🚪 Start Ngrok Tunnel
+        run: |
+          ./ngrok tcp --region=ap 3389 > /dev/null &
+          sleep 10
 
-    - name: 🔍 Get Ngrok RDP Address
-      id: rdp
-      run: |
-        max_attempts=5
-        for i in $(seq 1 $max_attempts); do
-          response=$(curl -s http://127.0.0.1:4040/api/tunnels)
-          tcp_tunnel=$(echo $response | grep -o '"public_url":"tcp://[^"]*"' | cut -d'"' -f4)
-          if [ ! -z "$tcp_tunnel" ]; then
-            echo "✅ RDP Endpoint: $tcp_tunnel"
-            echo "👤 Username: runneradmin"
-            echo "🔑 Password: Adminrdp123"
-            echo "rdp_address=$tcp_tunnel" >> $GITHUB_OUTPUT
-            exit 0
+      - name: 🔍 Get Ngrok RDP Address
+        id: rdp
+        run: |
+          max_attempts=5
+          for i in $(seq 1 $max_attempts); do
+            response=$(curl -s http://127.0.0.1:4040/api/tunnels)
+            tcp_tunnel=$(echo $response | grep -o '"public_url":"tcp://[^"]*"' | cut -d'"' -f4)
+            if [ ! -z "$tcp_tunnel" ]; then
+              echo "✅ RDP Endpoint: $tcp_tunnel"
+              echo "👤 Username: runneradmin"
+              echo "🔑 Password: Adminrdp123"
+              echo "rdp_address=$tcp_tunnel" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "❌ Ngrok tunnel did not start in time."
+          exit 1
+
+      - name: 📝 Add RDP Info to Job Summary
+        run: |
+          echo "## 🔗 RDP Connection Details" >> $GITHUB_STEP_SUMMARY
+          echo "**RDP Address:** ${{ steps.rdp.outputs.rdp_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Username:** runneradmin" >> $GITHUB_STEP_SUMMARY
+          echo "**Password:** Adminrdp123" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Use any RDP client to connect to the Ubuntu desktop." >> $GITHUB_STEP_SUMMARY
+
+      - name: 📥 Download ExpressVPN installer
+        run: |
+          wget https://www.expressvpn.com/clients/linux/expressvpn_3.42.0.0-1_amd64.deb
+
+      - name: 📥 Install ExpressVPN
+        run: |
+          echo "📦 Installing ExpressVPN package..."
+          sudo dpkg -i expressvpn_3.42.0.0-1_amd64.deb > /dev/null 2>&1 || true
+          
+          echo "📥 Installing dependencies..."
+          sudo apt-get install -f -y > /dev/null 2>&1
+          
+          echo "✅ ExpressVPN installation completed"
+
+      - name: 🔐 Activate ExpressVPN
+        continue-on-error: true
+        run: |
+          echo "Activating ExpressVPN..."
+          # Set environment variables to suppress prompts
+          export DEBIAN_FRONTEND=noninteractive
+          export TERM=dumb
+          
+          # Wait for ExpressVPN CLI to be available
+          sleep 5
+          
+          # Activate ExpressVPN
+          sudo /usr/bin/expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN
+          echo "Waiting 30s for activation to complete..."
+          sleep 30
+
+      - name: 🌍 Connect to Cambodia Server
+        continue-on-error: true
+        run: |
+          echo "Connecting to Cambodia server..."
+          # Get list of available regions
+          sudo /usr/bin/expressvpn list
+          
+          # Connect to Cambodia
+          sudo /usr/bin/expressvpn connect Cambodia
+          sleep 30
+
+      - name: 🔍 Verify Cambodia Connection
+        continue-on-error: true
+        run: |
+          vpn_status=$(sudo /usr/bin/expressvpn status)
+          echo "VPN Status: $vpn_status"
+          
+          ip_info=$(curl -s https://api.ipify.org?format=json)
+          current_ip=$(echo $ip_info | grep -o '"ip":"[^"]*"' | cut -d'"' -f4)
+          echo "Current IP: $current_ip"
+          
+          location_info=$(curl -s http://ip-api.com/json/$current_ip)
+          country=$(echo $location_info | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
+          city=$(echo $location_info | grep -o '"city":"[^"]*"' | cut -d'"' -f4)
+          
+          echo "IP Location: $country - $city"
+          
+          if [ "$country" != "Cambodia" ]; then
+            echo "⚠️ Not connected to Cambodia server, but continuing..."
+          else
+            echo "✅ Successfully connected to Cambodia server"
           fi
-          sleep 3
-        done
-        echo "❌ Ngrok tunnel did not start in time."
-        exit 1
 
-    - name: 📝 Add RDP Info to Job Summary
-      run: |
-        echo "## 🔗 RDP Connection Details" >> $GITHUB_STEP_SUMMARY
-        echo "**RDP Address:** ${{ steps.rdp.outputs.rdp_address }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Username:** runneradmin" >> $GITHUB_STEP_SUMMARY
-        echo "**Password:** Adminrdp123" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Use any RDP client to connect to the Ubuntu desktop." >> $GITHUB_STEP_SUMMARY
+      - name: 🐳 Check and Setup Docker
+        run: |
+          echo "🔍 Checking Docker installation..."
+          
+          # Check if Docker is already installed
+          if command -v docker &> /dev/null; then
+            echo "✅ Docker is already installed"
+          else
+            echo "📦 Docker not found, installing..."
+            
+            # Remove old versions if they exist
+            sudo apt-get remove -y docker docker-engine docker.io containerd runc > /dev/null 2>&1 || true
+            
+            # Update package list
+            sudo apt-get update > /dev/null 2>&1
+            
+            # Install prerequisites
+            sudo apt-get install -y \
+                apt-transport-https \
+                ca-certificates \
+                curl \
+                gnupg \
+                lsb-release > /dev/null 2>&1
+            
+            # Add Docker's official GPG key
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            
+            # Set up the stable repository
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+              $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            # Update package list again
+            sudo apt-get update > /dev/null 2>&1
+            
+            # Install Docker Engine and Docker Compose
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose > /dev/null 2>&1
+            
+            # Start and enable Docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            
+            # Add current user to docker group
+            sudo usermod -aG docker $USER
+            
+            echo "✅ Docker installation completed"
+          fi
 
-    - name: 📥 Download ExpressVPN installer
-      run: |
-        wget https://www.expressvpn.com/clients/linux/expressvpn_3.42.0.0-1_amd64.deb
+      - name: 📝 Create Environment File
+        run: |
+          echo "Creating .env file..."
+          cat > .env << 'EOL'
+BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+ADMIN_ID=${{ secrets.ADMIN_ID }}
+GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+URL=${{ secrets.URL }}
+USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
+PING_URL=${{ secrets.PING_URL }}
+EOL
+          echo "✅ Environment file created"
 
-    - name: 📥 Install ExpressVPN
-      run: |
-        echo "📦 Installing ExpressVPN package..."
-        sudo dpkg -i expressvpn_3.42.0.0-1_amd64.deb > /dev/null 2>&1 || true
-        
-        echo "📥 Installing dependencies..."
-        sudo apt-get install -f -y > /dev/null 2>&1
-        
-        echo "✅ ExpressVPN installation completed"
-
-    - name: 🔐 Activate ExpressVPN
-      continue-on-error: true
-      run: |
-        echo "Activating ExpressVPN..."
-        # Set environment variables to suppress prompts
-        export DEBIAN_FRONTEND=noninteractive
-        export TERM=dumb
-        
-        # Wait for ExpressVPN CLI to be available
-        sleep 5
-        
-        # Activate ExpressVPN
-        sudo /usr/bin/expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN
-        echo "Waiting 30s for activation to complete..."
-        sleep 30
-
-    - name: 🌍 Connect to Cambodia Server
-      continue-on-error: true
-      run: |
-        echo "Connecting to Cambodia server..."
-        # Get list of available regions
-        sudo /usr/bin/expressvpn list
-        
-        # Connect to Cambodia
-        sudo /usr/bin/expressvpn connect Cambodia
-        sleep 30
-
-    - name: 🔍 Verify Cambodia Connection
-      continue-on-error: true
-      run: |
-        vpn_status=$(sudo /usr/bin/expressvpn status)
-        echo "VPN Status: $vpn_status"
-        
-        ip_info=$(curl -s https://api.ipify.org?format=json)
-        current_ip=$(echo $ip_info | grep -o '"ip":"[^"]*"' | cut -d'"' -f4)
-        echo "Current IP: $current_ip"
-        
-        location_info=$(curl -s http://ip-api.com/json/$current_ip)
-        country=$(echo $location_info | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
-        city=$(echo $location_info | grep -o '"city":"[^"]*"' | cut -d'"' -f4)
-        
-        echo "IP Location: $country - $city"
-        
-        if [ "$country" != "Cambodia" ]; then
-          echo "⚠️ Not connected to Cambodia server, but continuing..."
-        else
-          echo "✅ Successfully connected to Cambodia server"
-        fi
-
-    - name: 🐳 Check and Setup Docker
-      run: |
-        echo "🔍 Checking Docker installation..."
-        
-        # Check if Docker is already installed
-        if command -v docker &> /dev/null; then
-          echo "✅ Docker is already installed"
-        else
-          echo "📦 Docker not found, installing..."
-          
-          # Remove old versions if they exist
-          sudo apt-get remove -y docker docker-engine docker.io containerd runc > /dev/null 2>&1 || true
-          
-          # Update package list
-          sudo apt-get update > /dev/null 2>&1
-          
-          # Install prerequisites
-          sudo apt-get install -y \
-              apt-transport-https \
-              ca-certificates \
-              curl \
-              gnupg \
-              lsb-release > /dev/null 2>&1
-          
-          # Add Docker's official GPG key
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          
-          # Set up the stable repository
-          echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          
-          # Update package list again
-          sudo apt-get update > /dev/null 2>&1
-          
-          # Install Docker Engine and Docker Compose
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose > /dev/null 2>&1
-          
-          # Start and enable Docker
-          sudo systemctl start docker
-          sudo systemctl enable docker
-          
-          # Add current user to docker group
-          sudo usermod -aG docker $USER
-          
-          echo "✅ Docker installation completed"
-        fi
-
-    - name: 📝 Create Environment File
-      run: |
-        echo "Creating .env file..."
-        cat > .env << 'EOL'
-          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-          ADMIN_ID=${{ secrets.ADMIN_ID }}
-          GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-          URL=${{ secrets.URL }}
-          USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
-          PING_URL=${{ secrets.PING_URL }}
-          EOL
-        echo "✅ Environment file created"
-
-    - name: 📝 Create Dockerfile.img
-      run: |
-        echo "Creating Dockerfile.img..."
-        cat > Dockerfile.img << 'EOL'
+      - name: 📝 Create Dockerfile.img
+        run: |
+          echo "Creating Dockerfile.img..."
+          cat > Dockerfile.img << 'EOL'
 FROM python:3.12.5-slim
 
 WORKDIR /app
@@ -255,12 +255,12 @@ EXPOSE 8080
 # Run the application
 CMD ["python", "bot+img.py"]
 EOL
-        echo "✅ Dockerfile.img created"
+          echo "✅ Dockerfile.img created"
 
-    - name: 📝 Create requirements.txt
-      run: |
-        echo "Creating requirements.txt..."
-        cat > requirements.txt << 'EOL'
+      - name: 📝 Create requirements.txt
+        run: |
+          echo "Creating requirements.txt..."
+          cat > requirements.txt << 'EOL'
 python-telegram-bot>=20.0
 python-dotenv>=0.19.0
 Flask==3.0.0
@@ -277,57 +277,57 @@ imgkit==1.2.3
 selenium==4.18.1
 webdriver-manager==4.0.1
 EOL
-        echo "✅ requirements.txt created"
+          echo "✅ requirements.txt created"
 
-    - name: 🚀 Run Docker Compose
-      run: |
-        echo "🔍 Checking Docker Compose files..."
-        
-        # List current directory contents
-        echo "Current directory contents:"
-        ls -la
-        
-        # Check if docker-compose.img.yml exists
-        if [ ! -f "docker-compose.img.yml" ]; then
-          echo "❌ docker-compose.img.yml not found"
-          exit 1
-        fi
-        
-        # Check if Dockerfile.img exists
-        if [ ! -f "Dockerfile.img" ]; then
-          echo "❌ Dockerfile.img not found"
-          exit 1
-        fi
-        
-        echo "✅ Found required files, starting Docker Compose..."
-        
-        # Use docker compose (new version) if available, otherwise use docker-compose
-        if command -v docker compose &> /dev/null; then
-          sudo docker compose -f docker-compose.img.yml up -d
-        else
-          sudo docker-compose -f docker-compose.img.yml up -d
-        fi
+      - name: 🚀 Run Docker Compose
+        run: |
+          echo "🔍 Checking Docker Compose files..."
+          
+          # List current directory contents
+          echo "Current directory contents:"
+          ls -la
+          
+          # Check if docker-compose.img.yml exists
+          if [ ! -f "docker-compose.img.yml" ]; then
+            echo "❌ docker-compose.img.yml not found"
+            exit 1
+          fi
+          
+          # Check if Dockerfile.img exists
+          if [ ! -f "Dockerfile.img" ]; then
+            echo "❌ Dockerfile.img not found"
+            exit 1
+          fi
+          
+          echo "✅ Found required files, starting Docker Compose..."
+          
+          # Use docker compose (new version) if available, otherwise use docker-compose
+          if command -v docker compose &> /dev/null; then
+            sudo docker compose -f docker-compose.img.yml up -d
+          else
+            sudo docker-compose -f docker-compose.img.yml up -d
+          fi
 
-    - name: 🕒 Keep Runner Alive
-      run: |
-        for i in {1..350}; do
-          echo "🏃 Staying alive... $i minutes"
-          sleep 60
-        done
+      - name: 🕒 Keep Runner Alive
+        run: |
+          for i in {1..350}; do
+            echo "🏃 Staying alive... $i minutes"
+            sleep 60
+          done
 
-    - name: 🔁 Auto-Restart Workflow
-      if: always()
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        if [ "${{ job.status }}" = "cancelled" ]; then
-          echo "🚫 Workflow was cancelled manually. Not restarting."
-          exit 0
-        fi
+      - name: 🔁 Auto-Restart Workflow
+        if: always()
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ "${{ job.status }}" = "cancelled" ]; then
+            echo "🚫 Workflow was cancelled manually. Not restarting."
+            exit 0
+          fi
 
-        curl -X POST \
-          -H "Authorization: Bearer $GH_PAT" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches \
-          -d '{"ref":"${{ github.ref }}"}'
-        echo "🔁 Re-triggered workflow run." 
+          curl -X POST \
+            -H "Authorization: Bearer $GH_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches \
+            -d '{"ref":"${{ github.ref }}"}'
+          echo "🔁 Re-triggered workflow run." 
