@@ -99,10 +99,7 @@ jobs:
         # Wait for ExpressVPN CLI to be available
         sleep 5
         
-        # Enable background mode first
-        sudo /usr/bin/expressvpn background enable
-        
-        # Activate using the new command format
+        # Activate ExpressVPN
         sudo /usr/bin/expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN
         echo "Waiting 30s for activation to complete..."
         sleep 30
@@ -187,6 +184,19 @@ jobs:
           
           echo "✅ Docker installation completed"
         fi
+
+    - name: 📝 Create Environment File
+      run: |
+        echo "Creating .env file..."
+        cat > .env << EOL
+BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+ADMIN_ID=${{ secrets.ADMIN_ID }}
+GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+URL=${{ secrets.URL }}
+USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
+PING_URL=${{ secrets.PING_URL }}
+EOL
+        echo "✅ Environment file created"
 
     - name: 🚀 Run Docker Compose
       run: |
