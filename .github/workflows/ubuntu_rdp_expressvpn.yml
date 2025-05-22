@@ -189,13 +189,13 @@ jobs:
       run: |
         echo "Creating .env file..."
         cat > .env << 'EOL'
-BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-ADMIN_ID=${{ secrets.ADMIN_ID }}
-GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-URL=${{ secrets.URL }}
-USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
-PING_URL=${{ secrets.PING_URL }}
-EOL
+          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+          ADMIN_ID=${{ secrets.ADMIN_ID }}
+          GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          URL=${{ secrets.URL }}
+          USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
+          PING_URL=${{ secrets.PING_URL }}
+          EOL
         echo "✅ Environment file created"
 
     - name: 📝 Create Dockerfile.img
