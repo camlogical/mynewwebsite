@@ -80,22 +80,18 @@ jobs:
 
     - name: 📥 Install ExpressVPN
       run: |
-        sudo dpkg -i expressvpn_3.42.0.0-1_amd64.deb || true
-        sudo apt-get install -f -y
+        echo "📦 Installing ExpressVPN package..."
+        sudo dpkg -i expressvpn_3.42.0.0-1_amd64.deb > /dev/null 2>&1 || true
+        
+        echo "📥 Installing dependencies..."
+        sudo apt-get install -f -y > /dev/null 2>&1
+        
+        echo "✅ ExpressVPN installation completed"
 
     - name: 🔐 Activate ExpressVPN
       run: |
-        # Create .env file if it doesn't exist
-        if [ ! -f .env ]; then
-          echo "EXPRESSVPN_CODE=EGDZJT2BC5AVY5E7YJS3PXN" > .env
-        fi
-        
-        # Read ExpressVPN activation code from .env file
-        EXPRESSVPN_CODE=$(grep EXPRESSVPN_CODE .env | cut -d '=' -f2-)
-        
-        # Activate ExpressVPN with suppressed output
         echo "Activating ExpressVPN..."
-        sudo expressvpn activate $EXPRESSVPN_CODE > /dev/null 2>&1
+        sudo expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN > /dev/null 2>&1
         sleep 30
 
     - name: 🌍 Connect to Cambodia Server
