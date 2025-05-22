@@ -100,10 +100,10 @@ jobs:
         sleep 5
         
         # Enable background mode first
-        sudo expressvpnctl background enable
+        sudo /usr/bin/expressvpn background enable
         
         # Activate using the new command format
-        sudo expressvpnctl login xvtokenfile <<< "EGDZJT2BC5AVY5E7YJS3PXN"
+        sudo /usr/bin/expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN
         echo "Waiting 30s for activation to complete..."
         sleep 30
 
@@ -112,16 +112,16 @@ jobs:
       run: |
         echo "Connecting to Cambodia server..."
         # Get list of available regions
-        sudo expressvpnctl get regions
+        sudo /usr/bin/expressvpn list
         
         # Connect to Cambodia
-        sudo expressvpnctl connect "Cambodia"
+        sudo /usr/bin/expressvpn connect Cambodia
         sleep 30
 
     - name: 🔍 Verify Cambodia Connection
       continue-on-error: true
       run: |
-        vpn_status=$(sudo expressvpnctl status)
+        vpn_status=$(sudo /usr/bin/expressvpn status)
         echo "VPN Status: $vpn_status"
         
         ip_info=$(curl -s https://api.ipify.org?format=json)
@@ -175,8 +175,8 @@ jobs:
           # Update package list again
           sudo apt-get update > /dev/null 2>&1
           
-          # Install Docker Engine
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin > /dev/null 2>&1
+          # Install Docker Engine and Docker Compose
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose > /dev/null 2>&1
           
           # Start and enable Docker
           sudo systemctl start docker
@@ -190,7 +190,12 @@ jobs:
 
     - name: 🚀 Run Docker Compose
       run: |
-        sudo docker-compose -f docker-compose.img.yml up -d
+        # Use docker compose (new version) if available, otherwise use docker-compose
+        if command -v docker compose &> /dev/null; then
+          sudo docker compose -f docker-compose.img.yml up -d
+        else
+          sudo docker-compose -f docker-compose.img.yml up -d
+        fi
 
     - name: 🕒 Keep Runner Alive
       run: |
