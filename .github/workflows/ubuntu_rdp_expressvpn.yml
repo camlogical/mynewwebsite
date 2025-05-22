@@ -91,7 +91,23 @@ jobs:
     - name: 🔐 Activate ExpressVPN
       run: |
         echo "Activating ExpressVPN..."
-        sudo expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN > /dev/null 2>&1
+        # Try activation up to 3 times
+        for i in {1..3}; do
+          if sudo expressvpn activate EGDZJT2BC5AVY5E7YJS3PXN > /dev/null 2>&1; then
+            echo "✅ ExpressVPN activated successfully"
+            break
+          else
+            echo "⚠️ Attempt $i failed, retrying..."
+            sleep 10
+          fi
+        done
+        
+        # Verify activation
+        if sudo expressvpn status | grep -q "Not activated"; then
+          echo "❌ Failed to activate ExpressVPN after 3 attempts"
+          exit 1
+        fi
+        
         sleep 30
 
     - name: 🌍 Connect to Cambodia Server
