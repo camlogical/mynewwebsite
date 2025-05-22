@@ -188,18 +188,119 @@ jobs:
     - name: 📝 Create Environment File
       run: |
         echo "Creating .env file..."
-        cat > .env << EOL
-        BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-        ADMIN_ID=${{ secrets.ADMIN_ID }}
-        GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
-        URL=${{ secrets.URL }}
-        USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
-        PING_URL=${{ secrets.PING_URL }}
-        EOL
+        cat > .env << 'EOL'
+BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+ADMIN_ID=${{ secrets.ADMIN_ID }}
+GOOGLE_CREDENTIALS_JSON=${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+URL=${{ secrets.URL }}
+USER_AGENTS_URL=${{ secrets.USER_AGENTS_URL }}
+PING_URL=${{ secrets.PING_URL }}
+EOL
         echo "✅ Environment file created"
+
+    - name: 📝 Create Dockerfile.img
+      run: |
+        echo "Creating Dockerfile.img..."
+        cat > Dockerfile.img << 'EOL'
+FROM python:3.12.5-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wkhtmltopdf \
+    xvfb \
+    libxrender1 \
+    libxtst6 \
+    libxi6 \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up display for Selenium
+ENV DISPLAY=:99
+
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY bot+img.py .
+COPY .env .
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Expose the port
+EXPOSE 8080
+
+# Run the application
+CMD ["python", "bot+img.py"]
+EOL
+        echo "✅ Dockerfile.img created"
+
+    - name: 📝 Create requirements.txt
+      run: |
+        echo "Creating requirements.txt..."
+        cat > requirements.txt << 'EOL'
+python-telegram-bot>=20.0
+python-dotenv>=0.19.0
+Flask==3.0.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+gspread==6.0.0
+google-auth==2.27.0
+gunicorn==21.2.0
+google-api-python-client==2.118.0
+aiohttp==3.9.1
+psutil==5.9.6
+Pillow==10.2.0
+imgkit==1.2.3
+selenium==4.18.1
+webdriver-manager==4.0.1
+EOL
+        echo "✅ requirements.txt created"
 
     - name: 🚀 Run Docker Compose
       run: |
+        echo "🔍 Checking Docker Compose files..."
+        
+        # List current directory contents
+        echo "Current directory contents:"
+        ls -la
+        
+        # Check if docker-compose.img.yml exists
+        if [ ! -f "docker-compose.img.yml" ]; then
+          echo "❌ docker-compose.img.yml not found"
+          exit 1
+        fi
+        
+        # Check if Dockerfile.img exists
+        if [ ! -f "Dockerfile.img" ]; then
+          echo "❌ Dockerfile.img not found"
+          exit 1
+        fi
+        
+        echo "✅ Found required files, starting Docker Compose..."
+        
         # Use docker compose (new version) if available, otherwise use docker-compose
         if command -v docker compose &> /dev/null; then
           sudo docker compose -f docker-compose.img.yml up -d
