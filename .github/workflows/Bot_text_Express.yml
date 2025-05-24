@@ -102,7 +102,7 @@ jobs:
       run: |
         Write-Output "Connecting to Cambodia server..."
         Set-Location "C:\Program Files (x86)\ExpressVPN\services"
-        & ".\ExpressVPN.CLI.exe" connect Argentina
+        & ".\ExpressVPN.CLI.exe" connect Cambodia
         Write-Output "Waiting 30 seconds for connection to establish..."
         Start-Sleep -Seconds 30
 
