@@ -67,7 +67,10 @@ jobs:
 
     - name: 🌐 Start OpenVPN
       run: |
-        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`"" -Wait
+        Write-Output "Starting OpenVPN in background..."
+        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`"" -NoNewWindow -PassThru
+        Write-Output "Waiting for OpenVPN to initialize..."
+        Start-Sleep -Seconds 30
 
     - name: 🌏 Verify OpenVPN Cambodia Connection
       run: |
