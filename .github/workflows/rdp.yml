@@ -69,51 +69,34 @@ jobs:
       run: |
         Write-Output "Starting OpenVPN..."
         $openvpnLog = "openvpn.log"
-        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`" --log `"$openvpnLog`"" -NoNewWindow -PassThru
+        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`" --log `"$openvpnLog`"" -Wait
         
-        $maxAttempts = 30
-        $attempt = 0
-        $success = $false
-        
-        while (-not $success -and $attempt -lt $maxAttempts) {
-          if (Test-Path $openvpnLog) {
-            $logContent = Get-Content $openvpnLog -Tail 20
-            if ($logContent -match "Initialization Sequence Completed") {
-              Write-Output "✅ OpenVPN initialization completed"
-              $success = $true
-              break
-            }
+        if (Test-Path $openvpnLog) {
+          $logContent = Get-Content $openvpnLog -Tail 20
+          if ($logContent -match "Initialization Sequence Completed") {
+            Write-Output "✅ OpenVPN initialization completed"
+          } else {
+            Write-Output "⚠️ OpenVPN initialization not confirmed, waiting 10s..."
+            Start-Sleep -Seconds 10
           }
-          Write-Output "Waiting for OpenVPN initialization... (Attempt $($attempt + 1))"
-          Start-Sleep -Seconds 1
-          $attempt++
-        }
-        
-        if (-not $success) {
-          Write-Output "⚠️ OpenVPN initialization not confirmed, proceeding anyway..."
+        } else {
+          Write-Output "⚠️ OpenVPN log not found, waiting 10s..."
           Start-Sleep -Seconds 10
         }
 
     - name: 🌏 Verify OpenVPN Cambodia Connection
       run: |
         Start-Sleep -Seconds 20
-        try {
-          $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
-          Write-Output "Current IP: $($ipInfo.ip)"
-          
-          $locationInfo = Invoke-RestMethod -Uri "http://ip-api.com/json/$($ipInfo.ip)"
-          Write-Output "IP Location: $($locationInfo.country) - $($locationInfo.city)"
-          
-          if ($locationInfo.country -eq "Cambodia") {
-            Write-Output "✅ Successfully connected to Cambodia server"
-          } else {
-            Write-Output "⚠️ Not connected to Cambodia server (Current country: $($locationInfo.country))"
-            Write-Output "Continuing to next step..."
-          }
-        } catch {
-          Write-Output "⚠️ Could not verify VPN connection: $_"
-          Write-Output "Continuing to next step..."
+        $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
+        Write-Output "Current IP: $($ipInfo.ip)"
+        $locationInfo = Invoke-RestMethod -Uri "http://ip-api.com/json/$($ipInfo.ip)"
+        Write-Output "IP Location: $($locationInfo.country) - $($locationInfo.city)"
+        if ($locationInfo.country -eq "Cambodia") {
+          Write-Output "✅ Successfully connected to Cambodia server"
+        } else {
+          Write-Output "⚠️ Not connected to Cambodia server (Current country: $($locationInfo.country))"
         }
+        Write-Output "Continuing to next step..."
 
     - name: 🔽 Download Your App
       run: Invoke-WebRequest -Uri "https://secuhex.com/app2.zip" -OutFile app2.zip
@@ -127,7 +110,7 @@ jobs:
 
     - name: 🕒 Keep Runner Alive
       run: |
-        for ($i = 0; $i -lt 358; $i++) {
+        for ($i = 0; $i -lt 330; $i++) {
           Write-Output "🏃 Staying alive... $i minutes"
           Start-Sleep -Seconds 60
         }
