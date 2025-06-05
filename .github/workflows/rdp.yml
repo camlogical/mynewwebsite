@@ -53,7 +53,7 @@ jobs:
         Write-Error "Ngrok tunnel did not start in time."
 
     - name: 📥 Download OpenVPN
-      run: Invoke-WebRequest -Uri "https://swupdate.openvpn.org/community/releases/openvpn-install-2.5.9-I601-amd64.msi" -OutFile "openvpn-installer.msi"
+      run: Invoke-WebRequest -Uri "https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.14-I001-amd64.msi" -OutFile "openvpn-installer.msi"
 
     - name: 🛠️ Install OpenVPN
       run: Start-Process msiexec.exe -ArgumentList '/i', 'openvpn-installer.msi', '/quiet', '/norestart' -Wait
