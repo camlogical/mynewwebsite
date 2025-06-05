@@ -28,40 +28,29 @@ jobs:
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Adminrdp123" -Force)
 
     - name: 🚪 Start Ngrok Tunnel
-      run: |
-        Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp --region=ap 3389" -NoNewWindow
-        Write-Output "Waiting for ngrok to start..."
-        Start-Sleep -Seconds 30
+      run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok\ngrok.exe tcp --region=ap 3389'
+
+    - name: ⏳ Wait for Tunnel
+      run: Start-Sleep -Seconds 10
 
     - name: 🔍 Get Ngrok RDP Address
       run: |
-        $maxAttempts = 10
-        $attempt = 0
-        $success = $false
-        
-        while (-not $success -and $attempt -lt $maxAttempts) {
+        $maxAttempts = 5
+        for ($i = 0; $i -lt $maxAttempts; $i++) {
           try {
-            $response = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction Stop
+            $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
             $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
-            
             if ($tcpTunnel) {
               Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
               Write-Output "👤 Username: runneradmin"
               Write-Output "🔑 Password: Adminrdp123"
-              $success = $true
-              break
+              exit 0
             }
           } catch {
-            Write-Output "Attempt $($attempt + 1) failed. Waiting before retry..."
-            Start-Sleep -Seconds 10
+            Start-Sleep -Seconds 3
           }
-          $attempt++
         }
-        
-        if (-not $success) {
-          Write-Error "❌ Ngrok tunnel failed to start after $maxAttempts attempts"
-          exit 1
-        }
+        Write-Error "Ngrok tunnel did not start in time."
 
     - name: 📥 Download OpenVPN
       run: Invoke-WebRequest -Uri "https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.14-I001-amd64.msi" -OutFile "openvpn-installer.msi"
