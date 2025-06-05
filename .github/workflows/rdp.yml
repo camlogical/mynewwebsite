@@ -1,0 +1,118 @@
+name: CI_RDP+Bot_img+openvpn
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: 📥 Download Ngrok
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+
+    - name: 🗜️ Extract Ngrok
+      run: Expand-Archive ngrok.zip -DestinationPath ngrok
+
+    - name: 🔐 Set Ngrok AuthToken
+      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: 🖥️ Enable RDP and Firewall
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+    - name: 🔑 Set Runner Admin Password
+      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Adminrdp123" -Force)
+
+    - name: 🚪 Start Ngrok Tunnel
+      run: Start-Process PowerShell -ArgumentList '-NoExit', '-Command', '.\ngrok\ngrok.exe tcp --region=ap 3389'
+
+    - name: ⏳ Wait for Tunnel
+      run: Start-Sleep -Seconds 10
+
+    - name: 🔍 Get Ngrok RDP Address
+      run: |
+        $maxAttempts = 5
+        for ($i = 0; $i -lt $maxAttempts; $i++) {
+          try {
+            $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
+            $tcpTunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
+            if ($tcpTunnel) {
+              Write-Output "✅ RDP Endpoint: $($tcpTunnel.public_url)"
+              Write-Output "👤 Username: runneradmin"
+              Write-Output "🔑 Password: Adminrdp123"
+              exit 0
+            }
+          } catch {
+            Start-Sleep -Seconds 3
+          }
+        }
+        Write-Error "Ngrok tunnel did not start in time."
+
+    - name: 📥 Download OpenVPN
+      run: Invoke-WebRequest -Uri "https://swupdate.openvpn.org/community/releases/openvpn-install-2.5.9-I601-amd64.msi" -OutFile "openvpn-installer.msi"
+
+    - name: 🛠️ Install OpenVPN
+      run: Start-Process msiexec.exe -ArgumentList '/i', 'openvpn-installer.msi', '/quiet', '/norestart' -Wait
+
+    - name: 📄 Create OpenVPN Auth File
+      run: |
+        Set-Content -Path vpn_auth.txt -Value "128e4d7ncfaaedyeo7i8m6fy`nzrmvyi8lp2a2338mnl6z64uk"
+
+    - name: 📄 Download OpenVPN Config
+      run: Invoke-WebRequest -Uri "https://secuhex.com/my_expressvpn_cambodia_udp.ovpn" -OutFile "my_expressvpn_cambodia_udp.ovpn"
+
+    - name: 🌐 Start OpenVPN
+      run: |
+        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`"" -Wait
+
+    - name: 🌏 Verify OpenVPN Cambodia Connection
+      run: |
+        Start-Sleep -Seconds 20
+        $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
+        Write-Output "Current IP: $($ipInfo.ip)"
+        $locationInfo = Invoke-RestMethod -Uri "http://ip-api.com/json/$($ipInfo.ip)"
+        Write-Output "IP Location: $($locationInfo.country) - $($locationInfo.city)"
+        if ($locationInfo.country -ne "Cambodia") {
+          Write-Error "❌ Not connected to Cambodia server"
+          exit 1
+        } else {
+          Write-Output "✅ Successfully connected to Cambodia server"
+        }
+
+    - name: 🔽 Download Your App
+      run: Invoke-WebRequest -Uri "https://secuhex.com/app2.zip" -OutFile app2.zip
+
+    - name: 🗜️ Extract App
+      run: Expand-Archive app2.zip -DestinationPath app2
+
+    - name: 🚀 Run telegram_land_checker.exe
+      run: |
+        Start-Process -FilePath "telegram_land_checker.exe" -WorkingDirectory "${{ github.workspace }}\app2"
+
+    - name: 🕒 Keep Runner Alive
+      run: |
+        for ($i = 0; $i -lt 358; $i++) {
+          Write-Output "🏃 Staying alive... $i minutes"
+          Start-Sleep -Seconds 60
+        }
+
+    - name: 🔁 Auto-Restart Workflow
+      if: always()
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        if ("${{ job.status }}" -eq "cancelled") {
+          Write-Output "🚫 Workflow was cancelled manually. Not restarting."
+          exit 0
+        }
+
+        $headers = @{ Authorization = "Bearer $Env:GH_PAT" }
+        $body = @{ ref = "${{ github.ref }}" } | ConvertTo-Json
+        Invoke-RestMethod `
+          -Uri "https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches" `
+          -Method POST -Headers $headers -Body $body -ContentType "application/json"
+        Write-Output "🔁 Re-triggered workflow run."
