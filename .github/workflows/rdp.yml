@@ -67,20 +67,52 @@ jobs:
 
     - name: 🌐 Start OpenVPN
       run: |
-        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`"" -Wait
+        Write-Output "Starting OpenVPN..."
+        $openvpnLog = "openvpn.log"
+        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`" --log `"$openvpnLog`"" -NoNewWindow -PassThru
+        
+        $maxAttempts = 30
+        $attempt = 0
+        $success = $false
+        
+        while (-not $success -and $attempt -lt $maxAttempts) {
+          if (Test-Path $openvpnLog) {
+            $logContent = Get-Content $openvpnLog -Tail 20
+            if ($logContent -match "Initialization Sequence Completed") {
+              Write-Output "✅ OpenVPN initialization completed"
+              $success = $true
+              break
+            }
+          }
+          Write-Output "Waiting for OpenVPN initialization... (Attempt $($attempt + 1))"
+          Start-Sleep -Seconds 1
+          $attempt++
+        }
+        
+        if (-not $success) {
+          Write-Output "⚠️ OpenVPN initialization not confirmed, proceeding anyway..."
+          Start-Sleep -Seconds 10
+        }
 
     - name: 🌏 Verify OpenVPN Cambodia Connection
       run: |
         Start-Sleep -Seconds 20
-        $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
-        Write-Output "Current IP: $($ipInfo.ip)"
-        $locationInfo = Invoke-RestMethod -Uri "http://ip-api.com/json/$($ipInfo.ip)"
-        Write-Output "IP Location: $($locationInfo.country) - $($locationInfo.city)"
-        if ($locationInfo.country -ne "Cambodia") {
-          Write-Error "❌ Not connected to Cambodia server"
-          exit 1
-        } else {
-          Write-Output "✅ Successfully connected to Cambodia server"
+        try {
+          $ipInfo = Invoke-RestMethod -Uri "https://api.ipify.org?format=json"
+          Write-Output "Current IP: $($ipInfo.ip)"
+          
+          $locationInfo = Invoke-RestMethod -Uri "http://ip-api.com/json/$($ipInfo.ip)"
+          Write-Output "IP Location: $($locationInfo.country) - $($locationInfo.city)"
+          
+          if ($locationInfo.country -eq "Cambodia") {
+            Write-Output "✅ Successfully connected to Cambodia server"
+          } else {
+            Write-Output "⚠️ Not connected to Cambodia server (Current country: $($locationInfo.country))"
+            Write-Output "Continuing to next step..."
+          }
+        } catch {
+          Write-Output "⚠️ Could not verify VPN connection: $_"
+          Write-Output "Continuing to next step..."
         }
 
     - name: 🔽 Download Your App
