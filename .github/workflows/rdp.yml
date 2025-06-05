@@ -68,7 +68,7 @@ jobs:
     - name: 🌐 Start OpenVPN
       run: |
         Write-Output "Starting OpenVPN..."
-        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`"" -Wait
+        Start-Process -FilePath "C:\Program Files\OpenVPN\bin\openvpn.exe" -ArgumentList "--config `"$PWD\my_expressvpn_cambodia_udp.ovpn`""
         Write-Output "Waiting 10 seconds..."
         Start-Sleep -Seconds 10
 
