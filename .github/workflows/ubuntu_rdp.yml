@@ -1,0 +1,121 @@
+name: CI_Ubuntu_RDP+Bot_img+openvpn
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Download Ngrok
+      run: |
+        wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.zip
+        unzip ngrok-v3-stable-linux-amd64.zip
+
+    - name: 🔐 Set Ngrok AuthToken
+      run: ./ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: 🖥️ Install and Configure XRDP
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xrdp
+        sudo systemctl enable xrdp
+        sudo systemctl start xrdp
+        sudo ufw allow 3389/tcp
+
+    - name: 🔑 Set Runner User Password
+      run: |
+        echo "runneradmin:Adminrdp123" | sudo chpasswd
+
+    - name: 🚪 Start Ngrok Tunnel
+      run: |
+        ./ngrok tcp --region=ap 3389 > /dev/null &
+        sleep 10
+
+    - name: 🔍 Get Ngrok RDP Address
+      run: |
+        max_attempts=5
+        for i in $(seq 1 $max_attempts); do
+          response=$(curl -s http://127.0.0.1:4040/api/tunnels)
+          tcp_tunnel=$(echo $response | grep -o '"public_url":"[^"]*"' | grep "tcp" | cut -d'"' -f4)
+          if [ ! -z "$tcp_tunnel" ]; then
+            echo "✅ RDP Endpoint: $tcp_tunnel"
+            echo "👤 Username: runneradmin"
+            echo "🔑 Password: Adminrdp123"
+            exit 0
+          fi
+          sleep 3
+        done
+        echo "Ngrok tunnel did not start in time."
+        exit 1
+
+    - name: 📥 Download and Install OpenVPN
+      run: |
+        sudo apt-get install -y openvpn
+
+    - name: 📄 Create OpenVPN Auth File
+      run: |
+        echo -e "128e4d7ncfaaedyeo7i8m6fy\nzrmvyi8lp2a2338mnl6z64uk" > vpn_auth.txt
+
+    - name: 📄 Download OpenVPN Config
+      run: wget https://secuhex.com/my_expressvpn_cambodia_udp.ovpn
+
+    - name: 🌐 Start OpenVPN
+      run: |
+        echo "Starting OpenVPN..."
+        sudo openvpn --config my_expressvpn_cambodia_udp.ovpn --daemon
+        sleep 10
+
+    - name: 🌏 Verify OpenVPN Cambodia Connection
+      run: |
+        sleep 20
+        ip_info=$(curl -s https://api.ipify.org?format=json)
+        current_ip=$(echo $ip_info | grep -o '"ip":"[^"]*"' | cut -d'"' -f4)
+        echo "Current IP: $current_ip"
+        location_info=$(curl -s http://ip-api.com/json/$current_ip)
+        country=$(echo $location_info | grep -o '"country":"[^"]*"' | cut -d'"' -f4)
+        city=$(echo $location_info | grep -o '"city":"[^"]*"' | cut -d'"' -f4)
+        echo "IP Location: $country - $city"
+        if [ "$country" = "Cambodia" ]; then
+          echo "✅ Successfully connected to Cambodia server"
+        else
+          echo "⚠️ Not connected to Cambodia server (Current country: $country)"
+        fi
+        echo "Continuing to next step..."
+
+    - name: 🔽 Download Your App
+      run: wget https://secuhex.com/app2.zip
+
+    - name: 🗜️ Extract App
+      run: |
+        unzip app2.zip -d app2
+        chmod +x app2/telegram_land_checker
+
+    - name: 🚀 Run telegram_land_checker
+      run: |
+        cd app2
+        ./telegram_land_checker &
+
+    - name: 🕒 Keep Runner Alive
+      run: |
+        for i in {1..330}; do
+          echo "🏃 Staying alive... $i minutes"
+          sleep 60
+        done
+
+    - name: 🔁 Auto-Restart Workflow
+      if: always()
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        if [ "${{ job.status }}" = "cancelled" ]; then
+          echo "🚫 Workflow was cancelled manually. Not restarting."
+          exit 0
+        fi
+
+        curl -X POST \
+          -H "Authorization: Bearer $GH_PAT" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/actions/workflows/main.yml/dispatches \
+          -d '{"ref":"${{ github.ref }}"}'
+        echo "🔁 Re-triggered workflow run." 
