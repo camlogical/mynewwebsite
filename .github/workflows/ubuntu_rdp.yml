@@ -1,4 +1,4 @@
-name: CI_Ubuntu_RDP+Bot_img+openvpn
+name: CI_Ubuntu_RDP+openvpn
 
 on: workflow_dispatch
 
@@ -82,19 +82,6 @@ jobs:
           echo "⚠️ Not connected to Cambodia server (Current country: $country)"
         fi
         echo "Continuing to next step..."
-
-    - name: 🔽 Download Your App
-      run: wget https://secuhex.com/app2.zip
-
-    - name: 🗜️ Extract App
-      run: |
-        unzip app2.zip -d app2
-        chmod +x app2/telegram_land_checker
-
-    - name: 🚀 Run telegram_land_checker
-      run: |
-        cd app2
-        ./telegram_land_checker &
 
     - name: 🕒 Keep Runner Alive
       run: |
